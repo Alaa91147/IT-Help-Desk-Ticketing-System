@@ -10,7 +10,7 @@ The system allows employees to submit IT support tickets, while IT support agent
 
 ## 2. System Users
 
-![alt text](image.png)
+![alt text](Role.png)
 
 ## 3. Functional Requirements
 
