@@ -6,21 +6,21 @@ USE ITHelpDeskDB;
 
 CREATE TABLE Role
 (
-    RoleId INT AUTO_INCREMENT NOT NULL,
+    Id INT AUTO_INCREMENT NOT NULL,
     RoleName VARCHAR(50) NOT NULL,
     RoleDescription VARCHAR(100),
     IsActive BOOLEAN NOT NULL DEFAULT TRUE,
     CreatedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT PK_Role PRIMARY KEY (RoleId),
+    CONSTRAINT PK_Role PRIMARY KEY (Id),
     CONSTRAINT UQ_Role_RoleName UNIQUE (RoleName)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Users Table
+-- User Table
 
-CREATE TABLE Users
+CREATE TABLE User
 (
-    UserId INT AUTO_INCREMENT NOT NULL,
+    Id INT AUTO_INCREMENT NOT NULL,
     RoleId INT NOT NULL,
 
     FirstName VARCHAR(50) NOT NULL,
@@ -32,19 +32,19 @@ CREATE TABLE Users
     IsActive BOOLEAN NOT NULL DEFAULT TRUE,
     CreatedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT PK_Users PRIMARY KEY (UserId),
-    CONSTRAINT UQ_Users_Email UNIQUE (Email),
+    CONSTRAINT PK_User PRIMARY KEY (Id),
+    CONSTRAINT UQ_User_Email UNIQUE (Email),
 
-    CONSTRAINT FK_Users_Role
+    CONSTRAINT FK_User_Role
         FOREIGN KEY (RoleId)
-        REFERENCES Role(RoleId)
+        REFERENCES Role(Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Category Table
 
 CREATE TABLE Category
 (
-    CategoryId INT AUTO_INCREMENT NOT NULL,
+    Id INT AUTO_INCREMENT NOT NULL,
 
     CategoryName VARCHAR(50) NOT NULL,
     CategoryDescription VARCHAR(100),
@@ -52,7 +52,7 @@ CREATE TABLE Category
     IsActive BOOLEAN NOT NULL DEFAULT TRUE,
     CreatedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT PK_Category PRIMARY KEY (CategoryId),
+    CONSTRAINT PK_Category PRIMARY KEY (Id),
     CONSTRAINT UQ_Category_CategoryName UNIQUE (CategoryName)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -60,7 +60,7 @@ CREATE TABLE Category
 
 CREATE TABLE Priority
 (
-    PriorityId INT AUTO_INCREMENT NOT NULL,
+    Id INT AUTO_INCREMENT NOT NULL,
 
     PriorityName VARCHAR(50) NOT NULL,
     PriorityDescription VARCHAR(100),
@@ -68,7 +68,7 @@ CREATE TABLE Priority
     IsActive BOOLEAN NOT NULL DEFAULT TRUE,
     CreatedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT PK_Priority PRIMARY KEY (PriorityId),
+    CONSTRAINT PK_Priority PRIMARY KEY (Id),
     CONSTRAINT UQ_Priority_PriorityName UNIQUE (PriorityName)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -76,7 +76,7 @@ CREATE TABLE Priority
 
 CREATE TABLE Status
 (
-    StatusId INT AUTO_INCREMENT NOT NULL,
+    Id INT AUTO_INCREMENT NOT NULL,
 
     StatusName VARCHAR(50) NOT NULL,
     StatusDescription VARCHAR(100),
@@ -84,7 +84,7 @@ CREATE TABLE Status
     IsActive BOOLEAN NOT NULL DEFAULT TRUE,
     CreatedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT PK_Status PRIMARY KEY (StatusId),
+    CONSTRAINT PK_Status PRIMARY KEY (Id),
     CONSTRAINT UQ_Status_StatusName UNIQUE (StatusName)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -93,7 +93,7 @@ CREATE TABLE Status
 
 CREATE TABLE Ticket
 (
-    TicketId INT AUTO_INCREMENT NOT NULL,
+    Id INT AUTO_INCREMENT NOT NULL,
 
     TicketNumber VARCHAR(30) NOT NULL,
 
@@ -109,36 +109,36 @@ CREATE TABLE Ticket
     CreatedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UpdatedDate DATETIME NULL,
 
-    CONSTRAINT PK_Ticket PRIMARY KEY (TicketId),
+    CONSTRAINT PK_Ticket PRIMARY KEY (Id),
 
     CONSTRAINT UQ_Ticket_TicketNumber UNIQUE (TicketNumber),
 
     CONSTRAINT FK_Ticket_User
         FOREIGN KEY (UserId)
-        REFERENCES Users(UserId),
+        REFERENCES User(Id),
 
     CONSTRAINT FK_Ticket_AssignedUser
         FOREIGN KEY (AssignedUserId)
-        REFERENCES Users(UserId),
+        REFERENCES User(Id),
 
     CONSTRAINT FK_Ticket_Category
         FOREIGN KEY (CategoryId)
-        REFERENCES Category(CategoryId),
+        REFERENCES Category(Id),
 
     CONSTRAINT FK_Ticket_Priority
         FOREIGN KEY (PriorityId)
-        REFERENCES Priority(PriorityId),
+        REFERENCES Priority(Id),
 
     CONSTRAINT FK_Ticket_Status
         FOREIGN KEY (StatusId)
-        REFERENCES Status(StatusId)
+        REFERENCES Status(Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- TicketAssignment Table
 
 CREATE TABLE TicketAssignment
 (
-    TicketAssignmentId INT AUTO_INCREMENT NOT NULL,
+    Id INT AUTO_INCREMENT NOT NULL,
 
     TicketId INT NOT NULL,
     AssignedUserId INT NOT NULL,
@@ -146,26 +146,26 @@ CREATE TABLE TicketAssignment
 
     AssignedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT PK_TicketAssignment PRIMARY KEY (TicketAssignmentId),
+    CONSTRAINT PK_TicketAssignment PRIMARY KEY (Id),
 
     CONSTRAINT FK_TicketAssignment_Ticket
         FOREIGN KEY (TicketId)
-        REFERENCES Ticket(TicketId),
+        REFERENCES Ticket(Id),
 
     CONSTRAINT FK_TicketAssignment_AssignedUser
         FOREIGN KEY (AssignedUserId)
-        REFERENCES Users(UserId),
+        REFERENCES User(Id),
 
     CONSTRAINT FK_TicketAssignment_AssignedByUser
         FOREIGN KEY (AssignedByUserId)
-        REFERENCES Users(UserId)
+        REFERENCES User(Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- TicketComment Table
 
 CREATE TABLE TicketComment
 (
-    TicketCommentId INT AUTO_INCREMENT NOT NULL,
+    Id INT AUTO_INCREMENT NOT NULL,
 
     TicketId INT NOT NULL,
     UserId INT NOT NULL,
@@ -174,22 +174,22 @@ CREATE TABLE TicketComment
 
     CreatedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT PK_TicketComment PRIMARY KEY (TicketCommentId),
+    CONSTRAINT PK_TicketComment PRIMARY KEY (Id),
 
     CONSTRAINT FK_TicketComment_Ticket
         FOREIGN KEY (TicketId)
-        REFERENCES Ticket(TicketId),
+        REFERENCES Ticket(Id),
 
     CONSTRAINT FK_TicketComment_User
         FOREIGN KEY (UserId)
-        REFERENCES Users(UserId)
+        REFERENCES User(Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- TicketAttachment Table
 
 CREATE TABLE TicketAttachment
 (
-    TicketAttachmentId INT AUTO_INCREMENT NOT NULL,
+    Id INT AUTO_INCREMENT NOT NULL,
 
     TicketId INT NOT NULL,
     UploadedByUserId INT NOT NULL,
@@ -200,15 +200,15 @@ CREATE TABLE TicketAttachment
 
     UploadedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT PK_TicketAttachment PRIMARY KEY (TicketAttachmentId),
+    CONSTRAINT PK_TicketAttachment PRIMARY KEY (Id),
 
     CONSTRAINT FK_TicketAttachment_Ticket
         FOREIGN KEY (TicketId)
-        REFERENCES Ticket(TicketId),
+        REFERENCES Ticket(Id),
 
     CONSTRAINT FK_TicketAttachment_User
         FOREIGN KEY (UploadedByUserId)
-        REFERENCES Users(UserId)
+        REFERENCES User(Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
@@ -216,7 +216,7 @@ CREATE TABLE TicketAttachment
 
 CREATE TABLE Notification
 (
-    NotificationId INT AUTO_INCREMENT NOT NULL,
+    Id INT AUTO_INCREMENT NOT NULL,
 
     UserId INT NOT NULL,
 
@@ -227,18 +227,18 @@ CREATE TABLE Notification
 
     CreatedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT PK_Notification PRIMARY KEY (NotificationId),
+    CONSTRAINT PK_Notification PRIMARY KEY (Id),
 
     CONSTRAINT FK_Notification_User
         FOREIGN KEY (UserId)
-        REFERENCES Users(UserId)
+        REFERENCES User(Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ActivityLog Table
 
 CREATE TABLE ActivityLog
 (
-    ActivityLogId INT AUTO_INCREMENT NOT NULL,
+    Id INT AUTO_INCREMENT NOT NULL,
 
     UserId INT NOT NULL,
     TicketId INT NULL,
@@ -247,13 +247,13 @@ CREATE TABLE ActivityLog
 
     CreatedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT PK_ActivityLog PRIMARY KEY (ActivityLogId),
+    CONSTRAINT PK_ActivityLog PRIMARY KEY (Id),
 
     CONSTRAINT FK_ActivityLog_User
         FOREIGN KEY (UserId)
-        REFERENCES Users(UserId),
+        REFERENCES User(Id),
 
     CONSTRAINT FK_ActivityLog_Ticket
         FOREIGN KEY (TicketId)
-        REFERENCES Ticket(TicketId)
+        REFERENCES Ticket(Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

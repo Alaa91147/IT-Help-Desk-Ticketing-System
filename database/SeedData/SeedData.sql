@@ -8,9 +8,9 @@ VALUES
 ('IT Support', 'IT Support Technician', TRUE),
 ('Employee', 'Company Employee', TRUE);
 
--- Users Data
+-- User Data
 
-INSERT INTO Users
+INSERT INTO User
 (RoleId, FirstName, LastName, Email, PasswordHash, PhoneNumber, IsActive)
 VALUES
 (1, 'Emma', 'Wilson', 'emma.wilson@techsolutions.com', 'Hash123Admin', '2145551001', TRUE),
