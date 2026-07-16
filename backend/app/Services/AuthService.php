@@ -9,6 +9,9 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class AuthService
@@ -127,4 +130,57 @@ class AuthService
     {
         $user->tokens()->delete();
     }
+    public function sendPasswordResetLink(string $email): void
+{
+    $status = Password::sendResetLink([
+        'email' => strtolower($email),
+    ]);
+
+    /*
+     * Do not reveal whether the email exists.
+     * This prevents account-enumeration attacks.
+     */
+    if (
+        $status !== Password::RESET_LINK_SENT &&
+        $status !== Password::INVALID_USER
+    ) {
+        throw ValidationException::withMessages([
+            'email' => [__($status)],
+        ]);
+    }
+}
+
+public function resetPassword(
+    string $email,
+    string $token,
+    string $password
+): void {
+    $status = Password::reset(
+        [
+            'email' => strtolower($email),
+            'password' => $password,
+            'password_confirmation' => $password,
+            'token' => $token,
+        ],
+        function (User $user, string $password): void {
+            $user->forceFill([
+                'password' => Hash::make($password),
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            /*
+             * Revoke all existing Sanctum tokens after a password reset.
+             */
+            $user->tokens()->delete();
+
+            event(new PasswordReset($user));
+        }
+    );
+
+    if ($status !== Password::PASSWORD_RESET) {
+        throw ValidationException::withMessages([
+            'email' => [__($status)],
+        ]);
+    }
+}
 }

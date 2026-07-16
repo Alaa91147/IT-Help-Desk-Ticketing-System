@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function (): void {
@@ -24,27 +25,53 @@ Route::prefix('auth')->group(function (): void {
         [AuthController::class, 'login']
     )->middleware('throttle:10,1');
 
-    Route::middleware('auth:sanctum')->group(
-        function (): void {
-            Route::get(
-                '/me',
-                [AuthController::class, 'me']
-            );
+    Route::post(
+        '/forgot-password',
+        [AuthController::class, 'forgotPassword']
+    )->middleware('throttle:3,1');
 
-            Route::post(
-                '/logout',
-                [AuthController::class, 'logout']
-            );
+    Route::post(
+        '/reset-password',
+        [AuthController::class, 'resetPassword']
+    )->middleware('throttle:5,1');
 
-            Route::post(
-                '/logout-all',
-                [AuthController::class, 'logoutAll']
-            );
-        }
-    );
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get(
+            '/me',
+            [AuthController::class, 'me']
+        );
+
+        Route::post(
+            '/logout',
+            [AuthController::class, 'logout']
+        );
+
+        Route::post(
+            '/logout-all',
+            [AuthController::class, 'logoutAll']
+        );
+    });
 });
 
+Route::middleware([
+    'auth:sanctum',
+    'role:Admin',
+])->prefix('admin/users')->group(function (): void {
+    Route::get(
+        '/',
+        [UserManagementController::class, 'index']
+    );
 
+    Route::patch(
+        '/{user}/activate',
+        [UserManagementController::class, 'activate']
+    );
+
+    Route::patch(
+        '/{user}/deactivate',
+        [UserManagementController::class, 'deactivate']
+    );
+});
 
 Route::middleware([
     'auth:sanctum',

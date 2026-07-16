@@ -14,6 +14,8 @@ use App\Http\Resources\UserResource;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Http\Requests\ForgotPasswordRequest;
+use App\Http\Requests\ResetPasswordRequest;
 
 class AuthController extends Controller
 {
@@ -113,4 +115,31 @@ class AuthController extends Controller
             'Logged out from all devices successfully.'
         );
     }
+    public function forgotPassword(
+    ForgotPasswordRequest $request
+): JsonResponse {
+    $this->authService->sendPasswordResetLink(
+        $request->string('email')->toString()
+    );
+
+    return ApiResponse::success(
+        null,
+        'If an account exists for this email, a password-reset link has been sent.'
+    );
+}
+
+public function resetPassword(
+    ResetPasswordRequest $request
+): JsonResponse {
+    $this->authService->resetPassword(
+        $request->string('email')->toString(),
+        $request->string('token')->toString(),
+        $request->string('password')->toString()
+    );
+
+    return ApiResponse::success(
+        null,
+        'Password reset successfully. You can now log in.'
+    );
+}
 }
