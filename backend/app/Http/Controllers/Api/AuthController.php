@@ -8,11 +8,12 @@ use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use App\Http\Requests\ResendRegistrationOtpRequest;
+use App\Http\Requests\VerifyRegistrationOtpRequest;
 use App\Http\Resources\UserResource;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Throwable;
 
 class AuthController extends Controller
 {
@@ -21,31 +22,50 @@ class AuthController extends Controller
     ) {
     }
 
-    public function register(RegisterRequest $request): JsonResponse
-    {
-        try {
-            $result = $this->authService->register(
-                RegisterData::fromRequest($request)
-            );
+    public function register(
+        RegisterRequest $request
+    ): JsonResponse {
+        $user = $this->authService->register(
+            RegisterData::fromRequest($request)
+        );
 
-            return ApiResponse::success(
-                [
-                    'user' => new UserResource($result['user']),
-                    'token' => $result['token'],
-                    'tokenType' => 'Bearer',
-                ],
-                'Registration successful.',
-                201
-            );
-        } catch (Throwable $exception) {
-            report($exception);
+        return ApiResponse::success(
+            [
+                'user' => new UserResource($user),
+                'requiresEmailVerification' => true,
+            ],
+            'Registration successful. A verification code was sent to your email.',
+            201
+        );
+    }
 
-            return ApiResponse::error(
-                'Registration failed.',
-                null,
-                500
-            );
-        }
+    public function verifyOtp(
+        VerifyRegistrationOtpRequest $request
+    ): JsonResponse {
+        $user = $this->authService->verifyRegistrationOtp(
+            $request->string('email')->toString(),
+            $request->string('otp')->toString()
+        );
+
+        return ApiResponse::success(
+            [
+                'user' => new UserResource($user),
+            ],
+            'Email verified successfully. You can now log in.'
+        );
+    }
+
+    public function resendOtp(
+        ResendRegistrationOtpRequest $request
+    ): JsonResponse {
+        $this->authService->resendRegistrationOtp(
+            $request->string('email')->toString()
+        );
+
+        return ApiResponse::success(
+            null,
+            'A new verification code was sent to your email.'
+        );
     }
 
     public function login(LoginRequest $request): JsonResponse

@@ -13,9 +13,14 @@ use RuntimeException;
 
 class AuthService
 {
-    public function register(RegisterData $data): array
+    public function __construct(
+        private readonly RegistrationOtpService $otpService
+    ) {
+    }
+
+    public function register(RegisterData $data): User
     {
-        return DB::transaction(function () use ($data): array {
+        return DB::transaction(function () use ($data): User {
             $userRole = Role::query()
                 ->where('roleName', 'User')
                 ->where('isActive', true)
@@ -31,31 +36,47 @@ class AuthService
                 'roleId' => $userRole->id,
                 'firstName' => $data->firstName,
                 'lastName' => $data->lastName,
-                'email' => $data->email,
+                'email' => strtolower($data->email),
                 'phoneNumber' => $data->phoneNumber,
                 'password' => Hash::make($data->password),
+
+                // The account exists but cannot log in until OTP verification.
                 'isActive' => true,
+                'emailVerifiedAt' => null,
             ]);
 
-            $token = $user
-                ->createToken('react-frontend')
-                ->plainTextToken;
+            $this->otpService->generateAndSend($user);
 
-            return [
-                'user' => $user->load('role'),
-                'token' => $token,
-            ];
+            return $user->load('role');
         });
+    }
+
+    public function verifyRegistrationOtp(
+        string $email,
+        string $otp
+    ): User {
+        return $this->otpService->verify(
+            strtolower($email),
+            $otp
+        );
+    }
+
+    public function resendRegistrationOtp(string $email): void
+    {
+        $this->otpService->resend(strtolower($email));
     }
 
     public function login(LoginData $data): array
     {
         $user = User::query()
             ->with('role')
-            ->where('email', $data->email)
+            ->where('email', strtolower($data->email))
             ->first();
 
-        if (!$user || !Hash::check($data->password, $user->password)) {
+        if (
+            !$user ||
+            !Hash::check($data->password, $user->password)
+        ) {
             throw ValidationException::withMessages([
                 'email' => [
                     'The provided email or password is incorrect.',
@@ -67,6 +88,14 @@ class AuthService
             throw ValidationException::withMessages([
                 'email' => [
                     'This account is inactive.',
+                ],
+            ]);
+        }
+
+        if ($user->emailVerifiedAt === null) {
+            throw ValidationException::withMessages([
+                'email' => [
+                    'Please verify your email before logging in.',
                 ],
             ]);
         }

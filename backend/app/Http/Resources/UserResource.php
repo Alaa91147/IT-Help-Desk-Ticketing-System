@@ -21,12 +21,22 @@ class UserResource extends JsonResource
             'phoneNumber' => $this->phoneNumber,
             'isActive' => $this->isActive,
 
-            'role' => $this->whenLoaded('role', function (): array {
-                return [
-                    'id' => $this->role->id,
-                    'roleName' => $this->role->roleName,
-                ];
-            }),
+            'isEmailVerified' => $this->emailVerifiedAt !== null,
+            'emailVerifiedAt' => $this->emailVerifiedAt,
+
+            'role' => $this->whenLoaded(
+                'role',
+                function (): ?array {
+                    if (!$this->role) {
+                        return null;
+                    }
+
+                    return [
+                        'id' => $this->role->id,
+                        'roleName' => $this->role->roleName,
+                    ];
+                }
+            ),
 
             'createdAt' => $this->createdAt,
             'updatedAt' => $this->updatedAt,

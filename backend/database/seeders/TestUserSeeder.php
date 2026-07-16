@@ -11,9 +11,17 @@ class TestUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $adminRole = Role::where('roleName', 'Admin')->firstOrFail();
-        $agentRole = Role::where('roleName', 'SupportAgent')->firstOrFail();
-        $userRole = Role::where('roleName', 'User')->firstOrFail();
+        $adminRole = Role::query()
+            ->where('roleName', 'Admin')
+            ->firstOrFail();
+
+        $agentRole = Role::query()
+            ->where('roleName', 'SupportAgent')
+            ->firstOrFail();
+
+        $userRole = Role::query()
+            ->where('roleName', 'User')
+            ->firstOrFail();
 
         User::updateOrCreate(
             ['email' => 'admin@test.com'],
@@ -24,6 +32,10 @@ class TestUserSeeder extends Seeder
                 'phoneNumber' => null,
                 'password' => Hash::make('Password123'),
                 'isActive' => true,
+                'emailVerifiedAt' => now(),
+                'verificationCode' => null,
+                'verificationCodeExpiresAt' => null,
+                'verificationCodeSentAt' => null,
             ]
         );
 
@@ -36,6 +48,10 @@ class TestUserSeeder extends Seeder
                 'phoneNumber' => null,
                 'password' => Hash::make('Password123'),
                 'isActive' => true,
+                'emailVerifiedAt' => now(),
+                'verificationCode' => null,
+                'verificationCodeExpiresAt' => null,
+                'verificationCodeSentAt' => null,
             ]
         );
 
@@ -48,6 +64,10 @@ class TestUserSeeder extends Seeder
                 'phoneNumber' => null,
                 'password' => Hash::make('Password123'),
                 'isActive' => true,
+                'emailVerifiedAt' => now(),
+                'verificationCode' => null,
+                'verificationCodeExpiresAt' => null,
+                'verificationCodeSentAt' => null,
             ]
         );
     }

@@ -27,15 +27,21 @@ class User extends Authenticatable
         'password',
         'isActive',
         'emailVerifiedAt',
+        'verificationCode',
+        'verificationCodeExpiresAt',
+        'verificationCodeSentAt',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'verificationCode',
     ];
 
     protected $casts = [
         'emailVerifiedAt' => 'datetime',
+        'verificationCodeExpiresAt' => 'datetime',
+        'verificationCodeSentAt' => 'datetime',
         'isActive' => 'boolean',
         'createdAt' => 'datetime',
         'updatedAt' => 'datetime',
@@ -71,12 +77,18 @@ class User extends Authenticatable
 
     public function appNotifications(): HasMany
     {
-        return $this->hasMany(Notification::class, 'userId');
+        return $this->hasMany(
+            Notification::class,
+            'userId'
+        );
     }
 
     public function activityLogs(): HasMany
     {
-        return $this->hasMany(ActivityLog::class, 'userId');
+        return $this->hasMany(
+            ActivityLog::class,
+            'userId'
+        );
     }
 
     public function receivedAssignments(): HasMany
@@ -93,5 +105,10 @@ class User extends Authenticatable
             TicketAssignment::class,
             'assignedByUserId'
         );
+    }
+
+    public function hasVerifiedEmail(): bool
+    {
+        return $this->emailVerifiedAt !== null;
     }
 }
