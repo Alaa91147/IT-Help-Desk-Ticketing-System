@@ -1,0 +1,91 @@
+# Week 1 Report
+
+# IT Help Desk Ticketing System
+
+## Overview
+
+Week 1 focused on planning and designing the
+IT Help Desk Ticketing System before
+development began.
+
+## Completed Tasks
+
+- Gathered project requirements
+- Created workflow diagrams
+- Designed UI wireframes in Figma
+- Planned the React frontend
+- Designed the MySQL database
+- Created the ERD
+- Prepared project documentation
+- Created the GitHub repository
+
+## Deliverables
+
+### Workflow Diagrams
+
+Workflow diagrams are located in the
+`docs` folder.
+
+### UI Wireframes
+
+UI wireframes were designed in Figma.
+
+The exported wireframes are located in the
+`assets` folder.
+
+The frontend will be implemented using
+React (JavaScript).
+
+### Database Design
+
+The database resources are located in the
+`database` folder.
+
+Contents include:
+
+- SQL scripts
+- Seed files
+- ERD diagram
+
+### Documentation
+
+Project documentation is located in the
+`docs` folder.
+
+### GitHub Repository
+
+The complete project source code is
+available in the GitHub repository.
+
+## Folder Structure
+
+
+assets/
+  UI Wireframes
+
+database/
+  SQL Scripts
+  Seed Files
+  ERD Diagram
+
+docs/
+  Requirements
+  Workflow Diagrams
+  Project Documents
+
+
+## Technologies
+
+- Figma
+- React (JavaScript)
+- Laravel
+- MySQL
+- Git
+- GitHub
+
+## Summary
+
+All Week 1 planning and design tasks were
+completed successfully. The project is
+ready for backend API development in
+Week 2.

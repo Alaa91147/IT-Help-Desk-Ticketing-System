@@ -1,0 +1,190 @@
+# Week 2 Report
+
+## IT Help Desk Ticketing System
+
+## Overview
+
+Week 2 focused on backend development using
+Laravel, MySQL, and Laravel Sanctum.
+
+The authentication system, user management,
+Role-Based Access Control (RBAC), password
+recovery, and email verification were
+implemented and tested.
+
+## Completed Tasks
+
+* Built the backend authentication module
+* Implemented user registration
+* Added email OTP verification
+* Configured Gmail SMTP
+* Implemented forgot password
+* Implemented password reset
+* Implemented secure login
+* Added Bearer token authentication
+* Implemented logout
+* Implemented logout from all devices
+* Created authenticated user profile API
+* Implemented Role-Based Access Control (RBAC)
+* Created Admin user management APIs
+* Added account activation and deactivation
+* Prevented inactive users from logging in
+* Configured OTP expiration
+* Added OTP resend cooldown
+* Added automatic deletion of unverified
+  accounts after 24 hours
+* Configured Sanctum token expiration
+* Implemented secure password hashing
+* Integrated MySQL database
+* Completed database migrations
+* Created models
+* Created database relationships
+* Added database seeders
+* Tested all APIs using Postman
+
+## Authentication APIs
+
+### Register User
+
+* **POST** /api/auth/register
+* Registers a new user and sends an
+  email OTP verification code.
+
+### Verify Registration OTP
+
+* **POST** /api/auth/verify-otp
+* Verifies the user's email using the OTP.
+
+### Resend OTP
+
+* **POST** /api/auth/resend-otp
+* Sends a new OTP to users who have not
+  verified their email.
+
+### Forgot Password
+
+* **POST** /api/auth/forgot-password
+* Sends a password reset email.
+
+### Reset Password
+
+* **POST** /api/auth/reset-password
+* Resets the user's password using the
+  reset token.
+
+### Login
+
+* **POST** /api/auth/login
+* Authenticates a verified user and
+  returns a Laravel Sanctum Bearer token.
+
+### Get Current User
+
+* **GET** /api/auth/me
+* Returns the authenticated user's
+  profile information.
+
+### Logout
+
+* **POST** /api/auth/logout
+* Revokes the current access token.
+
+### Logout All Devices
+
+* **POST** /api/auth/logout-all
+* Revokes all active access tokens.
+
+## User Management APIs
+
+### Get All Users
+
+* **GET** /api/admin/users
+* Returns all registered users.
+
+### Activate User
+
+* **PATCH** /api/admin/users/{id}/activate
+* Activates a user account.
+
+### Deactivate User
+
+* **PATCH** /api/admin/users/{id}/deactivate
+* Deactivates a user account and prevents
+  future logins.
+
+## Role-Based Access Control
+
+### Admin Route
+
+* **GET** /api/admin/test
+* Accessible only by Admin users.
+
+### Support Agent Route
+
+* **GET** /api/agent/test
+* Accessible only by Support Agent users.
+
+### User Route
+
+* **GET** /api/user/test
+* Accessible only by User accounts.
+
+## Backend Features
+
+* Laravel Sanctum authentication
+* Bearer token authentication
+* Email OTP verification
+* Gmail SMTP integration
+* Forgot password functionality
+* Password reset functionality
+* OTP expiration
+* OTP resend cooldown
+* Role-Based Access Control (RBAC)
+* Account activation and deactivation
+* Inactive account protection
+* Automatic deletion of unverified users
+  after 24 hours
+* Secure password hashing
+* Sanctum token expiration
+* MySQL database integration
+* Database migrations
+* Models
+* Relationships
+* Seeders
+
+## Testing
+
+* Tested user registration
+* Tested email OTP verification
+* Tested OTP resend
+* Tested forgot password
+* Tested password reset
+* Tested login
+* Tested authenticated user profile
+* Tested logout
+* Tested logout from all devices
+* Tested Admin user management
+* Tested account activation
+* Tested account deactivation
+* Tested inactive user restrictions
+* Tested Role-Based Access Control (RBAC)
+* Verified Bearer token authentication
+* Completed API testing using Postman
+
+## Technologies
+
+* Laravel
+* Laravel Sanctum
+* MySQL
+* Gmail SMTP
+* Postman
+* Git
+* GitHub
+
+## Summary
+
+Week 2 successfully completed the backend
+authentication and user management module.
+All APIs were implemented, secured, and
+fully tested. The backend is now ready
+for integration with the React frontend.
