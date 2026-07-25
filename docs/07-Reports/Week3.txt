@@ -1,0 +1,286 @@
+# Week 3 Report
+
+## IT Help Desk Ticketing System
+
+--------------------------------------------
+
+## Overview
+
+Week 3 focused on backend ticket management
+development using Laravel, MySQL, and Laravel
+Sanctum.
+
+The Ticket Management System, ticket CRUD
+operations, ticket workflow, categories, priorities,
+search, filtering, pagination, sorting, and
+Role-Based Access Control were implemented
+and tested.
+
+--------------------------------------------
+
+## Completed Tasks
+
+* Built the backend ticket management module
+* Implemented ticket CRUD operations
+* Created ticket creation API
+* Implemented ticket update API
+* Implemented ticket deletion API
+* Implemented ticket viewing APIs
+* Added automatic ticket number generation
+* Added ticket categories
+* Added ticket priorities
+* Added ticket statuses
+* Implemented ticket assignment
+* Implemented ticket workflow
+* Added Admin and Support Agent permissions
+* Implemented Role-Based Access Control (RBAC)
+* Added ticket protection during InProgress status
+* Implemented ticket search
+* Implemented ticket filtering
+* Added status filtering
+* Added category filtering
+* Added priority filtering
+* Added assigned user filtering
+* Added date filtering
+* Implemented ticket sorting
+* Implemented pagination
+* Added request validation
+* Added API error handling
+* Tested all APIs using Postman
+
+--------------------------------------------
+
+# Ticket Management APIs
+
+--------------------------------------------
+
+## Get All Tickets
+
+* **GET** /api/tickets
+
+* Returns all tickets with related information:
+
+  * User
+  * Assigned Support Agent
+  * Category
+  * Priority
+  * Status
+
+Features:
+
+* Search
+* Filtering
+* Sorting
+* Pagination
+
+--------------------------------------------
+
+## Get Single Ticket
+
+* **GET** /api/tickets/{ticket}
+
+* Returns details of a specific ticket.
+
+--------------------------------------------
+
+## Create Ticket
+
+* **POST** /api/tickets
+
+* Creates a new ticket.
+
+Features:
+
+* Generates unique ticket number
+* Assigns logged-in user as ticket owner
+* Sets default status to Open
+
+--------------------------------------------
+
+## Update Ticket
+
+* **PUT** /api/tickets/{ticket}
+
+* Updates ticket information:
+
+  * Subject
+  * Description
+  * Category
+  * Priority
+
+--------------------------------------------
+
+## Delete Ticket
+
+* **DELETE** /api/tickets/{ticket}
+
+* Deletes an existing ticket.
+
+--------------------------------------------
+
+## Assign Ticket
+
+* **PATCH** /api/tickets/{ticket}/assign
+
+* Allows Admin users to assign tickets
+to Support Agents.
+
+* Changes ticket status to Assigned.
+
+--------------------------------------------
+
+## Start Ticket
+
+* **PATCH** /api/tickets/{ticket}/start
+
+* Allows assigned Support Agents to start
+working on tickets.
+
+* Changes ticket status to InProgress.
+
+--------------------------------------------
+
+## Resolve Ticket
+
+* **PATCH** /api/tickets/{ticket}/resolve
+
+* Allows assigned Support Agents to resolve
+tickets.
+
+* Saves resolution date and time.
+
+--------------------------------------------
+
+## Close Ticket
+
+* **PATCH** /api/tickets/{ticket}/close
+
+* Allows Admin users to close tickets.
+
+* Saves closing date and time.
+
+--------------------------------------------
+
+# Ticket Workflow
+
+Open
+
+↓
+
+Assigned
+
+↓
+
+InProgress
+
+↓
+
+Resolved
+
+↓
+
+Closed
+
+--------------------------------------------
+
+# Role-Based Access Control
+
+## Admin
+
+* Full ticket management access
+* Assign tickets
+* Update tickets
+* Delete tickets
+* Close tickets
+
+--------------------------------------------
+
+## Support Agent
+
+* View tickets
+* Create tickets
+* Manage assigned tickets
+* Start tickets
+* Resolve tickets
+
+--------------------------------------------
+
+## User
+
+* View tickets
+* Create tickets
+* Track tickets
+
+--------------------------------------------
+
+# Backend Features
+
+* Laravel Sanctum authentication
+* Bearer token authentication
+* Ticket CRUD operations
+* Ticket number generation
+* Ticket categories
+* Ticket priorities
+* Ticket statuses
+* Ticket assignment
+* Ticket workflow
+* Role-Based Access Control (RBAC)
+* Ticket ownership
+* InProgress ticket protection
+* Keyword search
+* Filtering system
+* Date filtering
+* Sorting system
+* Pagination
+* Validation handling
+* Error handling
+* MySQL database integration
+* Database relationships
+* Database seeders
+
+--------------------------------------------
+
+# Testing
+
+* Tested ticket creation
+* Tested ticket viewing
+* Tested ticket updating
+* Tested ticket deletion
+* Tested ticket assignment
+* Tested ticket workflow
+* Tested search functionality
+* Tested filtering
+* Tested date filtering
+* Tested sorting
+* Tested pagination
+* Tested validation errors
+* Tested unauthorized access
+* Tested forbidden permissions
+* Tested missing ticket errors
+* Tested Bearer token authentication
+* Completed API testing using Postman
+
+--------------------------------------------
+
+# Technologies
+
+* Laravel
+* Laravel Sanctum
+* MySQL
+* Postman
+* Git
+* GitHub
+
+--------------------------------------------
+
+# Summary
+
+Week 3 successfully completed the backend
+Ticket Management System.
+
+All required ticket APIs were implemented,
+secured, and tested.
+
+The backend now supports complete ticket
+management functionality and is ready for
+future React frontend integration.

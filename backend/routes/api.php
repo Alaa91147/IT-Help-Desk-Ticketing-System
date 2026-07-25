@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\TicketController;
 
 Route::prefix('auth')->group(function (): void {
     Route::post(
@@ -101,4 +102,51 @@ Route::middleware([
         'success' => true,
         'message' => 'Welcome User',
     ]);
+});
+
+Route::middleware([
+    'auth:sanctum',
+])->prefix('tickets')->group(function (): void {
+
+    Route::get(
+        '/',
+        [TicketController::class, 'index']
+    );
+
+    Route::get(
+    '/{ticket}',
+    [TicketController::class, 'show']
+    );
+
+    Route::put(
+        '/{ticket}',
+        [TicketController::class, 'update']
+    );
+
+        Route::post(
+        '/',
+        [TicketController::class, 'store']
+    );
+
+    Route::delete(
+    '/{ticket}',
+    [TicketController::class, 'destroy']
+    );
+
+    Route::patch(
+        '/{ticket}/assign',
+        [TicketController::class, 'assign']
+    );
+
+    Route::patch('/{ticket}/start', 
+    [TicketController::class, 'start']
+    );
+
+    Route::patch('/{ticket}/resolve', 
+    [TicketController::class, 'resolve']
+    );
+
+    Route::patch('/{ticket}/close', 
+    [TicketController::class, 'close']
+    );
 });
