@@ -1,9 +1,20 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\PriorityController;
+use App\Http\Controllers\Api\StatusController;
+use App\Http\Controllers\Api\TicketAttachmentController;
+use App\Http\Controllers\Api\TicketCommentController;
+use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\TicketController;
+
+/*
+|--------------------------------------------------------------------------
+| Authentication
+|--------------------------------------------------------------------------
+*/
 
 Route::prefix('auth')->group(function (): void {
     Route::post(
@@ -54,6 +65,11 @@ Route::prefix('auth')->group(function (): void {
     });
 });
 
+/*
+|--------------------------------------------------------------------------
+| Admin User Management
+|--------------------------------------------------------------------------
+*/
 Route::middleware([
     'auth:sanctum',
     'role:Admin',
@@ -72,7 +88,18 @@ Route::middleware([
         '/{user}/deactivate',
         [UserManagementController::class, 'deactivate']
     );
+
+    Route::patch(
+        '/{user}/role',
+        [UserManagementController::class, 'updateRole']
+    );
 });
+
+/*
+|--------------------------------------------------------------------------
+| Role Test Endpoints
+|--------------------------------------------------------------------------
+*/
 
 Route::middleware([
     'auth:sanctum',
@@ -106,47 +133,198 @@ Route::middleware([
 
 Route::middleware([
     'auth:sanctum',
-])->prefix('tickets')->group(function (): void {
+    'role:Manager',
+])->get('/manager/test', function () {
+    return response()->json([
+        'success' => true,
+        'message' => 'Welcome Manager',
+    ]);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated Lookup Endpoints
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth:sanctum')->group(function (): void {
+    Route::get(
+        '/categories',
+        [CategoryController::class, 'index']
+    );
 
     Route::get(
-        '/',
-        [TicketController::class, 'index']
+        '/categories/{category}',
+        [CategoryController::class, 'show']
     );
 
     Route::get(
-    '/{ticket}',
-    [TicketController::class, 'show']
+        '/priorities',
+        [PriorityController::class, 'index']
     );
 
-    Route::put(
-        '/{ticket}',
-        [TicketController::class, 'update']
+    Route::get(
+        '/priorities/{priority}',
+        [PriorityController::class, 'show']
     );
 
-        Route::post(
-        '/',
-        [TicketController::class, 'store']
+    Route::get(
+        '/statuses',
+        [StatusController::class, 'index']
     );
 
-    Route::delete(
-    '/{ticket}',
-    [TicketController::class, 'destroy']
+    Route::get(
+        '/statuses/{status}',
+        [StatusController::class, 'show']
+    );
+
+    Route::get(
+        '/support-agents',
+        [UserManagementController::class, 'supportAgents']
+    );
+
+    Route::get(
+        '/manager/reports/tickets',
+        [TicketController::class, 'ticketSummary']
+    );
+});
+
+/*
+|--------------------------------------------------------------------------
+| Admin Category and Priority Management
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware([
+    'auth:sanctum',
+    'role:Admin',
+])->group(function (): void {
+    Route::post(
+        '/categories',
+        [CategoryController::class, 'store']
     );
 
     Route::patch(
-        '/{ticket}/assign',
-        [TicketController::class, 'assign']
+        '/categories/{category}',
+        [CategoryController::class, 'update']
     );
 
-    Route::patch('/{ticket}/start', 
-    [TicketController::class, 'start']
+    Route::delete(
+        '/categories/{category}',
+        [CategoryController::class, 'destroy']
     );
 
-    Route::patch('/{ticket}/resolve', 
-    [TicketController::class, 'resolve']
+    Route::post(
+        '/priorities',
+        [PriorityController::class, 'store']
     );
 
-    Route::patch('/{ticket}/close', 
-    [TicketController::class, 'close']
+    Route::patch(
+        '/priorities/{priority}',
+        [PriorityController::class, 'update']
+    );
+
+    Route::delete(
+        '/priorities/{priority}',
+        [PriorityController::class, 'destroy']
     );
 });
+
+/*
+|--------------------------------------------------------------------------
+| Tickets, Comments, and Attachments
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth:sanctum')
+    ->prefix('tickets')
+    ->group(function (): void {
+        // Ticket CRUD
+        Route::get(
+            '/',
+            [TicketController::class, 'index']
+        );
+
+        Route::post(
+            '/',
+            [TicketController::class, 'store']
+        );
+
+        Route::get(
+            '/{ticket}',
+            [TicketController::class, 'show']
+        );
+
+        Route::put(
+            '/{ticket}',
+            [TicketController::class, 'update']
+        );
+
+        Route::delete(
+            '/{ticket}',
+            [TicketController::class, 'destroy']
+        );
+
+        // Assignment and status workflow
+        Route::patch(
+            '/{ticket}/assign',
+            [TicketController::class, 'assign']
+        );
+
+        Route::patch(
+            '/{ticket}/start',
+            [TicketController::class, 'start']
+        );
+
+        Route::patch(
+            '/{ticket}/resolve',
+            [TicketController::class, 'resolve']
+        );
+
+        Route::patch(
+            '/{ticket}/close',
+            [TicketController::class, 'close']
+        );
+
+        // Comments
+        Route::get(
+            '/{ticket}/comments',
+            [TicketCommentController::class, 'index']
+        );
+
+        Route::post(
+            '/{ticket}/comments',
+            [TicketCommentController::class, 'store']
+        );
+
+        Route::patch(
+            '/{ticket}/comments/{comment}',
+            [TicketCommentController::class, 'update']
+        );
+
+        Route::delete(
+            '/{ticket}/comments/{comment}',
+            [TicketCommentController::class, 'destroy']
+        );
+
+        // Attachments
+        Route::get(
+            '/{ticket}/attachments',
+            [TicketAttachmentController::class, 'index']
+        );
+
+        Route::post(
+            '/{ticket}/attachments',
+            [TicketAttachmentController::class, 'store']
+        );
+
+        Route::get(
+            '/{ticket}/attachments/{attachment}/download',
+            [TicketAttachmentController::class, 'download']
+        );
+
+        Route::delete(
+            '/{ticket}/attachments/{attachment}',
+            [TicketAttachmentController::class, 'destroy']
+        );
+    });

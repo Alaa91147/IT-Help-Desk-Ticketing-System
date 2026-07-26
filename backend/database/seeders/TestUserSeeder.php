@@ -15,6 +15,10 @@ class TestUserSeeder extends Seeder
             ->where('roleName', 'Admin')
             ->firstOrFail();
 
+        $managerRole = Role::query()
+            ->where('roleName', 'Manager')
+            ->firstOrFail();
+
         $agentRole = Role::query()
             ->where('roleName', 'SupportAgent')
             ->firstOrFail();
@@ -29,6 +33,22 @@ class TestUserSeeder extends Seeder
                 'roleId' => $adminRole->id,
                 'firstName' => 'Admin',
                 'lastName' => 'User',
+                'phoneNumber' => null,
+                'password' => Hash::make('Password123'),
+                'isActive' => true,
+                'emailVerifiedAt' => now(),
+                'verificationCode' => null,
+                'verificationCodeExpiresAt' => null,
+                'verificationCodeSentAt' => null,
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'manager@test.com'],
+            [
+                'roleId' => $managerRole->id,
+                'firstName' => 'Ticket',
+                'lastName' => 'Manager',
                 'phoneNumber' => null,
                 'password' => Hash::make('Password123'),
                 'isActive' => true,

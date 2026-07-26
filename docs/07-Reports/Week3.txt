@@ -7,14 +7,18 @@
 ## Overview
 
 Week 3 focused on backend ticket management
-development using Laravel, MySQL, and Laravel
-Sanctum.
+development using Laravel, MySQL, Laravel
+Sanctum, and role-based authorization.
 
-The Ticket Management System, ticket CRUD
-operations, ticket workflow, categories, priorities,
+The Ticket Management System, CRUD operations,
+ticket workflow, Manager assignment, categories,
+priorities, comments, attachments, reports,
 search, filtering, pagination, sorting, and
-Role-Based Access Control were implemented
-and tested.
+Role-Based Access Control were implemented.
+
+Automated backend feature tests were completed
+successfully. Manual Postman verification is
+currently being completed by a team member.
 
 --------------------------------------------
 
@@ -26,27 +30,36 @@ and tested.
 * Implemented ticket update API
 * Implemented ticket deletion API
 * Implemented ticket viewing APIs
-* Added automatic ticket number generation
+* Added automatic unique ticket number generation
 * Added ticket categories
 * Added ticket priorities
-* Added ticket statuses
-* Implemented ticket assignment
-* Implemented ticket workflow
-* Added Admin and Support Agent permissions
+* Added protected workflow statuses
+* Implemented Manager/Admin ticket assignment
+* Added assignment-history tracking
+* Implemented the complete ticket workflow
+* Added Employee, Support Agent, Manager, and Admin permissions
 * Implemented Role-Based Access Control (RBAC)
-* Added ticket protection during InProgress status
-* Implemented ticket search
+* Added ticket ownership and assignment checks
+* Added ticket protection after work begins
+* Implemented keyword search
 * Implemented ticket filtering
 * Added status filtering
 * Added category filtering
 * Added priority filtering
-* Added assigned user filtering
-* Added date filtering
-* Implemented ticket sorting
+* Added assigned-user filtering
+* Added exact-date and date-range filtering
+* Implemented safe ticket sorting
 * Implemented pagination
+* Added ticket comments
+* Added internal Support Agent comments
+* Added ticket attachment upload and download
+* Added Manager ticket reports
+* Added Support Agent workload statistics
+* Added Admin user activation and deactivation
+* Added Admin user-role changes
 * Added request validation
 * Added API error handling
-* Tested all APIs using Postman
+* Added automated Laravel feature tests
 
 --------------------------------------------
 
@@ -58,20 +71,29 @@ and tested.
 
 * **GET** /api/tickets
 
-* Returns all tickets with related information:
+Returns tickets with related information:
 
-  * User
-  * Assigned Support Agent
-  * Category
-  * Priority
-  * Status
+* Ticket creator
+* Assigned Support Agent
+* Category
+* Priority
+* Status
+
+Visibility is controlled by role:
+
+* Employee sees their own tickets
+* Support Agent sees assigned tickets
+* Manager sees all tickets
+* Admin sees all tickets
 
 Features:
 
-* Search
+* Keyword search
 * Filtering
 * Sorting
 * Pagination
+* Exact-date filtering
+* Date-range filtering
 
 --------------------------------------------
 
@@ -79,7 +101,8 @@ Features:
 
 * **GET** /api/tickets/{ticket}
 
-* Returns details of a specific ticket.
+Returns the details of a specific ticket if the
+authenticated user is authorized to view it.
 
 --------------------------------------------
 
@@ -87,13 +110,14 @@ Features:
 
 * **POST** /api/tickets
 
-* Creates a new ticket.
+Creates a new ticket.
 
 Features:
 
-* Generates unique ticket number
-* Assigns logged-in user as ticket owner
-* Sets default status to Open
+* Generates a unique ticket number
+* Assigns the logged-in Employee or Admin as owner
+* Sets the default status to Open
+* Validates category, priority, subject, and description
 
 --------------------------------------------
 
@@ -101,12 +125,16 @@ Features:
 
 * **PUT** /api/tickets/{ticket}
 
-* Updates ticket information:
+Updates:
 
-  * Subject
-  * Description
-  * Category
-  * Priority
+* Subject
+* Description
+* Category
+* Priority
+
+An Employee can update their own ticket only
+while its status is Open. Admin retains override
+access.
 
 --------------------------------------------
 
@@ -114,7 +142,8 @@ Features:
 
 * **DELETE** /api/tickets/{ticket}
 
-* Deletes an existing ticket.
+An Employee can delete their own ticket only
+while it is Open. Admin retains override access.
 
 --------------------------------------------
 
@@ -122,10 +151,15 @@ Features:
 
 * **PATCH** /api/tickets/{ticket}/assign
 
-* Allows Admin users to assign tickets
-to Support Agents.
+Allows Managers and Admins to assign or reassign
+tickets to active Support Agents.
 
-* Changes ticket status to Assigned.
+The operation:
+
+* Validates that the selected user is an active Support Agent
+* Changes ticket status to Assigned
+* Records who assigned the ticket
+* Records the assignment date and time
 
 --------------------------------------------
 
@@ -133,10 +167,10 @@ to Support Agents.
 
 * **PATCH** /api/tickets/{ticket}/start
 
-* Allows assigned Support Agents to start
-working on tickets.
+Allows only the assigned Support Agent to start
+working on an Assigned ticket.
 
-* Changes ticket status to InProgress.
+Changes the ticket status to InProgress.
 
 --------------------------------------------
 
@@ -144,10 +178,11 @@ working on tickets.
 
 * **PATCH** /api/tickets/{ticket}/resolve
 
-* Allows assigned Support Agents to resolve
-tickets.
+Allows the assigned Support Agent or Admin to
+resolve an InProgress ticket.
 
-* Saves resolution date and time.
+Changes the status to Resolved and saves the
+resolution date and time.
 
 --------------------------------------------
 
@@ -155,9 +190,10 @@ tickets.
 
 * **PATCH** /api/tickets/{ticket}/close
 
-* Allows Admin users to close tickets.
+Allows Admin to close a Resolved ticket.
 
-* Saves closing date and time.
+Changes the status to Closed and saves the
+closing date and time.
 
 --------------------------------------------
 
@@ -181,84 +217,207 @@ Resolved
 
 Closed
 
+Invalid workflow transitions are rejected.
+
 --------------------------------------------
 
 # Role-Based Access Control
 
 ## Admin
 
-* Full ticket management access
-* Assign tickets
-* Update tickets
-* Delete tickets
-* Close tickets
+* Full ticket access
+* Create, view, update, and delete tickets
+* Assign and reassign tickets
+* Resolve and close tickets
+* Activate and deactivate users
+* Change user roles
+* Manage categories and priorities
+* Access reports
 
 --------------------------------------------
 
-## Support Agent
+## Manager
 
-* View tickets
-* Create tickets
-* Manage assigned tickets
-* Start tickets
-* Resolve tickets
+* View and monitor all tickets
+* Search, filter, sort, and paginate tickets
+* View active Support Agents
+* Assign and reassign tickets
+* View ticket reports
+* Monitor Support Agent workload
 
 --------------------------------------------
 
-## User
+## IT Support Agent
 
-* View tickets
+* View assigned tickets
+* Start assigned tickets
+* Resolve assigned tickets
+* Add visible and internal comments
+* Upload attachments
+* Cannot work on another agent's ticket
+
+--------------------------------------------
+
+## Employee
+
 * Create tickets
-* Track tickets
+* View and track their own tickets
+* Edit or delete their own Open tickets
+* Add comments and attachments to their own tickets
+* Cannot edit or delete after the ticket is assigned
+* Cannot view internal Support Agent comments
+
+--------------------------------------------
+
+# Ticket Comments
+
+* **GET** /api/tickets/{ticket}/comments
+* **POST** /api/tickets/{ticket}/comments
+* **PATCH** /api/tickets/{ticket}/comments/{comment}
+* **DELETE** /api/tickets/{ticket}/comments/{comment}
+
+Features:
+
+* Ticket-level authorization
+* Visible and internal comments
+* Internal-comment privacy for Employees
+* Author/Admin update and deletion permissions
+* Closed-ticket protection
+
+--------------------------------------------
+
+# Ticket Attachments
+
+* **GET** /api/tickets/{ticket}/attachments
+* **POST** /api/tickets/{ticket}/attachments
+* **GET** /api/tickets/{ticket}/attachments/{attachment}/download
+* **DELETE** /api/tickets/{ticket}/attachments/{attachment}
+
+Features:
+
+* Secure upload and download
+* Maximum file size of 10 MB
+* PDF, DOC, DOCX, PNG, JPG, JPEG, and TXT support
+* Ticket-level authorization
+* Uploader/Admin deletion permissions
+* Stored-file cleanup after deletion
+
+--------------------------------------------
+
+# Category, Priority, and Status APIs
+
+Authenticated lookup APIs:
+
+* **GET** /api/categories
+* **GET** /api/priorities
+* **GET** /api/statuses
+
+Admin management:
+
+* Create, update, and delete categories
+* Create, update, and delete priorities
+* Prevent deletion of values already used by tickets
+
+Workflow statuses are read-only because changing
+their names would break ticket transitions.
+
+--------------------------------------------
+
+# Manager Reports
+
+* **GET** /api/manager/reports/tickets
+
+The Manager/Admin report returns:
+
+* Total ticket count
+* Unassigned ticket count
+* Tickets grouped by status
+* Tickets grouped by category
+* Tickets grouped by priority
+* Assigned-ticket count by Support Agent
+* InProgress-ticket count by Support Agent
+* Resolved/Closed-ticket count by Support Agent
+* Optional date-range filtering
 
 --------------------------------------------
 
 # Backend Features
 
 * Laravel Sanctum authentication
-* Bearer token authentication
+* Bearer-token authentication
 * Ticket CRUD operations
-* Ticket number generation
+* Unique ticket-number generation
 * Ticket categories
 * Ticket priorities
-* Ticket statuses
-* Ticket assignment
-* Ticket workflow
-* Role-Based Access Control (RBAC)
-* Ticket ownership
+* Protected workflow statuses
+* Ticket assignment history
+* Ticket workflow validation
+* Role-Based Access Control
+* Ticket ownership and assignment protection
 * InProgress ticket protection
 * Keyword search
-* Filtering system
-* Date filtering
-* Sorting system
+* Status, category, priority, agent, and date filtering
+* Safe sorting
 * Pagination
-* Validation handling
-* Error handling
+* Comments and internal comments
+* Secure attachments
+* Manager reports
+* User-role management
+* Validation and structured error responses
 * MySQL database integration
-* Database relationships
+* Eloquent relationships
 * Database seeders
+* Automated feature testing
+
+--------------------------------------------
+
+# Database Naming
+
+The custom database schema follows the required
+naming convention:
+
+* Every custom table has id as its primary key
+* Custom foreign keys use camelCase without underscores
+* Examples: roleId, userId, ticketId, categoryId,
+  priorityId, statusId, assignedUserId,
+  assignedByUserId, and uploadedByUserId
+* Custom timestamps use createdAt and updatedAt
+* Laravel internal fields retain Laravel's required names
 
 --------------------------------------------
 
 # Testing
 
-* Tested ticket creation
-* Tested ticket viewing
-* Tested ticket updating
-* Tested ticket deletion
-* Tested ticket assignment
-* Tested ticket workflow
-* Tested search functionality
-* Tested filtering
-* Tested date filtering
-* Tested sorting
-* Tested pagination
-* Tested validation errors
-* Tested unauthorized access
-* Tested forbidden permissions
-* Tested missing ticket errors
-* Tested Bearer token authentication
-* Completed API testing using Postman
+## Automated Tests
+
+Ten ticket-management feature tests passed.
+
+The tests covered:
+
+* Employee ticket privacy
+* Support Agent assignment privacy
+* Manager ticket visibility
+* Manager assignment
+* Assignment-history creation
+* Unauthorized assignment
+* Complete status workflow
+* Ticket editing protection
+* Manager report authorization
+* Internal-comment privacy
+* Attachment upload and deletion
+* Admin user-role changes
+
+Tests use an in-memory SQLite database and do not
+modify the normal MySQL development database.
+
+## Postman Testing
+
+A complete Postman testing checklist was prepared
+for all authentication, ticket, lookup, comment,
+attachment, report, and user-management APIs.
+
+Manual Postman verification is currently being
+completed by a team member.
 
 --------------------------------------------
 
@@ -267,20 +426,40 @@ Closed
 * Laravel
 * Laravel Sanctum
 * MySQL
+* SQLite for automated tests
+* PHPUnit
 * Postman
 * Git
 * GitHub
 
 --------------------------------------------
 
+# Challenges and Solutions
+
+* Added the missing Manager role and test account
+* Corrected incomplete ticket permissions
+* Protected all ticket-related routes
+* Connected the existing assignment-history table
+* Implemented previously empty category, priority,
+  status, comment, and attachment controllers
+* Corrected UserFactory to match the camelCase schema
+* Enabled SQLite support for safe automated testing
+
+--------------------------------------------
+
 # Summary
 
-Week 3 successfully completed the backend
-Ticket Management System.
+Week 3 completed the required backend Ticket
+Management System.
 
-All required ticket APIs were implemented,
-secured, and tested.
+The backend now supports secure ticket CRUD,
+role-based visibility, Manager assignment,
+Support Agent workflow, ticket locking, search,
+filters, comments, attachments, reports, and
+user-role management.
 
-The backend now supports complete ticket
-management functionality and is ready for
-future React frontend integration.
+All automated ticket-management feature tests
+passed. Manual Postman verification is in progress.
+
+The backend APIs are ready for React frontend
+integration after final Postman confirmation.
