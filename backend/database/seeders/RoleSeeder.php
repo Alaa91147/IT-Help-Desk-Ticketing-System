@@ -26,6 +26,14 @@ class RoleSeeder extends Seeder
         );
 
         Role::updateOrCreate(
+    ['roleName' => 'Manager'],
+    [
+        'description' => 'Assigns tickets and monitors support operations',
+        'isActive' => true,
+    ]
+);
+
+        Role::updateOrCreate(
             ['roleName' => 'User'],
             [
                 'description' => 'Creates and tracks support tickets',
