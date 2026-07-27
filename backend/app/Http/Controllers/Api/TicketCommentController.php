@@ -29,7 +29,7 @@ class TicketCommentController extends Controller
     private function canParticipate(User $user, Ticket $ticket): bool
     {
         return match ($this->roleName($user)) {
-            'Admin' => true,
+            'Admin', 'Manager' => true,
             'SupportAgent' => (int) $ticket->assignedUserId === (int) $user->id,
             'User' => (int) $ticket->userId === (int) $user->id,
             default => false,
@@ -55,10 +55,20 @@ class TicketCommentController extends Controller
 
         $comments = $ticket->comments()
             ->with('user.role')
-            ->when(
-                $this->roleName($user) === 'User',
-                fn ($query) => $query->where('isInternal', false)
-            )
+                ->when(
+                    !(
+                        $this->roleName($user) === 'Admin'
+                        || (
+                            $this->roleName($user) === 'SupportAgent'
+                            && (int) $ticket->assignedUserId === (int) $user->id
+                        )
+                        || (
+                            $this->roleName($user) === 'User'
+                            && (int) $ticket->userId === (int) $user->id
+                        )
+                    ),
+                    fn ($query) => $query->where('isInternal', false)
+                )
             ->orderBy('createdAt')
             ->get();
 
@@ -91,11 +101,12 @@ class TicketCommentController extends Controller
             'isInternal' => ['sometimes', 'boolean'],
         ]);
 
-        $canCreateInternal = in_array(
-            $this->roleName($user),
-            ['Admin', 'SupportAgent'],
-            true
-        );
+        $canCreateInternal = match ($this->roleName($user)) {
+            'Admin' => true,
+            'SupportAgent' => (int) $ticket->assignedUserId === (int) $user->id,
+            'User' => (int) $ticket->userId === (int) $user->id,
+            default => false,
+        };
 
         $comment = $ticket->comments()->create([
             'userId' => $user->id,

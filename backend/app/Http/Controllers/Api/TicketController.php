@@ -39,7 +39,9 @@ class TicketController extends Controller
     {
         return match ($this->roleName($user)) {
             self::ADMIN, self::MANAGER => true,
-            self::AGENT => (int) $ticket->assignedUserId === (int) $user->id,
+            self::AGENT =>
+            (int) $ticket->assignedUserId === (int) $user->id
+            || in_array($ticket->status?->statusName, ['Open', 'Closed'], true),
             self::EMPLOYEE => (int) $ticket->userId === (int) $user->id,
             default => false,
         };
@@ -80,7 +82,16 @@ class TicketController extends Controller
         if ($role === self::EMPLOYEE) {
             $tickets->where('userId', $user->id);
         } elseif ($role === self::AGENT) {
-            $tickets->where('assignedUserId', $user->id);
+
+            $tickets->where(function (Builder $query) use ($user) {
+
+                $query->whereHas('status', function (Builder $status) {
+                    $status->whereIn('statusName', ['Open', 'Closed']);
+                })
+                ->orWhere('assignedUserId', $user->id);
+
+            });
+
         } elseif (!in_array($role, [self::ADMIN, self::MANAGER], true)) {
             return $this->forbidden();
         }

@@ -51,7 +51,7 @@ currently being completed by a team member.
 * Implemented safe ticket sorting
 * Implemented pagination
 * Added ticket comments
-* Added internal Support Agent comments
+* Added public and private ticket comments
 * Added ticket attachment upload and download
 * Added Manager ticket reports
 * Added Support Agent workload statistics
@@ -60,7 +60,16 @@ currently being completed by a team member.
 * Added request validation
 * Added API error handling
 * Added automated Laravel feature tests
-
+* Refined ticket ownership authorization
+* Implemented assigned Support Agent permissions
+* Updated public and private comment authorization
+* Restricted private comments to assigned Support Agents
+* Restricted ticket owners to public comments only
+* Prevented unauthorized ticket and comment access
+* Allowed closed tickets to remain accessible for history tracking
+* Updated Support Agent ticket visibility rules
+* Verified Manager role creation and authentication
+* Completed manual Postman authorization testing
 --------------------------------------------
 
 # Ticket Management APIs
@@ -82,7 +91,7 @@ Returns tickets with related information:
 Visibility is controlled by role:
 
 * Employee sees their own tickets
-* Support Agent sees assigned tickets
+* Support Agent sees assigned tickets and Open/Closed tickets for history tracking
 * Manager sees all tickets
 * Admin sees all tickets
 
@@ -101,8 +110,14 @@ Features:
 
 * **GET** /api/tickets/{ticket}
 
-Returns the details of a specific ticket if the
-authenticated user is authorized to view it.
+Returns the details of a specific ticket.
+
+Authorization:
+
+* Ticket owners can view their own tickets
+* Assigned Support Agents can view assigned tickets
+* Managers and Admins can view all tickets
+* Unauthorized requests return HTTP 403 Forbidden
 
 --------------------------------------------
 
@@ -249,10 +264,13 @@ Invalid workflow transitions are rejected.
 
 ## IT Support Agent
 
+
 * View assigned tickets
+* View Open and Closed tickets for history tracking
 * Start assigned tickets
 * Resolve assigned tickets
-* Add visible and internal comments
+* Add public and private comments
+* View private comments on assigned tickets
 * Upload attachments
 * Cannot work on another agent's ticket
 
@@ -260,27 +278,69 @@ Invalid workflow transitions are rejected.
 
 ## Employee
 
+
 * Create tickets
 * View and track their own tickets
 * Edit or delete their own Open tickets
-* Add comments and attachments to their own tickets
+* Add public comments and attachments to their own tickets
+* View public and private comments on their own tickets
 * Cannot edit or delete after the ticket is assigned
-* Cannot view internal Support Agent comments
+--------------------------------------------
+
+## Get Ticket Comments
+
+* **GET** /api/tickets/{ticket}/comments
+
+Returns all comments for the selected ticket.
+
+Authorization:
+
+* Ticket owners can view comments on their own tickets
+* Assigned Support Agents can view comments on assigned tickets
+* Unassigned Support Agents cannot view comments
+* Private comments are visible to the ticket owner and assigned Support Agent
+* Unauthorized requests return HTTP 403 Forbidden
 
 --------------------------------------------
 
-# Ticket Comments
+## Create Ticket Comment
 
-* **GET** /api/tickets/{ticket}/comments
 * **POST** /api/tickets/{ticket}/comments
+
+Creates a new comment for the selected ticket.
+
+Authorization:
+
+* Ticket owners can create public comments
+* Assigned Support Agents can create public and private comments
+* Support Agents cannot comment on tickets that are not assigned to them
+* Unauthorized requests return HTTP 403 Forbidden
+
+--------------------------------------------
+
+## Update Ticket Comment
+
 * **PATCH** /api/tickets/{ticket}/comments/{comment}
+
+The comment author can update their own comment.
+Admin retains override access.
+
+--------------------------------------------
+
+## Delete Ticket Comment
+
 * **DELETE** /api/tickets/{ticket}/comments/{comment}
+
+The comment author can delete their own comment.
+Admin retains override access.
 
 Features:
 
 * Ticket-level authorization
-* Visible and internal comments
-* Internal-comment privacy for Employees
+* Public and private comments
+* Ticket owners can create public comments
+* Assigned Support Agents can create public and private comments
+* Private comments are restricted to authorized users
 * Author/Admin update and deletion permissions
 * Closed-ticket protection
 
@@ -359,7 +419,7 @@ The Manager/Admin report returns:
 * Status, category, priority, agent, and date filtering
 * Safe sorting
 * Pagination
-* Comments and internal comments
+* Public and private comments
 * Secure attachments
 * Manager reports
 * User-role management
@@ -444,6 +504,10 @@ completed by a team member.
   status, comment, and attachment controllers
 * Corrected UserFactory to match the camelCase schema
 * Enabled SQLite support for safe automated testing
+* Refined ticket ownership and assigned Support Agent authorization
+* Updated public/private comment permissions
+* Allowed Support Agents to access Open/Closed tickets for history tracking
+* Verified Manager role creation and authentication through database seeders
 
 --------------------------------------------
 
