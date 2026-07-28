@@ -3,26 +3,43 @@ import { useEffect, useState } from "react";
 import DashboardLayout from "../components/Dashboard/DashboardLayout";
 import RecentTicketsTable from "../components/Dashboard/RecentTicketsTable";
 import StatCard from "../components/Dashboard/StatCard";
-import { getDashboardSummary } from "../api/dashboardApi";
+import {
+  getDashboardSummary,
+  getRecentTickets,
+} from "../api/dashboardApi";
 
 function DashboardPage() {
   const [summary, setSummary] = useState(null);
+  const [recentTickets, setRecentTickets] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     async function loadDashboard() {
       try {
-        const response = await getDashboardSummary();
+        setIsLoading(true);
+        setErrorMessage("");
+        const [summaryResponse, ticketsResponse] = await Promise.all([
+          getDashboardSummary(),
+          getRecentTickets(),
+        ]);
 
-        console.log("Dashboard Response:", response);
-        console.log("Summary Data:", response.data);
+        setSummary(summaryResponse?.data || null);
 
-        setSummary(response.data);
+        const paginator = ticketsResponse?.data || {};
+        const ticketItems = Array.isArray(paginator?.data)
+          ? paginator.data
+          : Array.isArray(paginator)
+            ? paginator
+            : [];
+
+        setRecentTickets(ticketItems.slice(0, 5));
       } catch (error) {
-        console.error("Dashboard Error:", error);
-
-        if (error.data) {
-          console.error("Error Response:", error.data);
-        }
+        setErrorMessage(
+          error.message || "Unable to load dashboard information."
+        );
+      } finally {
+        setIsLoading(false);
       }
     }
 
@@ -31,6 +48,9 @@ function DashboardPage() {
 
   return (
     <DashboardLayout>
+      {errorMessage && (
+        <div className="dashboard-alert">{errorMessage}</div>
+      )}
       <div className="stats-grid">
         <StatCard
           title="Total Tickets"
@@ -53,7 +73,10 @@ function DashboardPage() {
         />
       </div>
 
-      <RecentTicketsTable />
+      <RecentTicketsTable
+        tickets={recentTickets}
+        isLoading={isLoading}
+      />
     </DashboardLayout>
   );
 }

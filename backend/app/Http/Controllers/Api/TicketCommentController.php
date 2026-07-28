@@ -20,7 +20,8 @@ class TicketCommentController extends Controller
     {
         return match ($this->roleName($user)) {
             'Admin', 'Manager' => true,
-            'SupportAgent' => (int) $ticket->assignedUserId === (int) $user->id,
+            'SupportAgent' =>
+                (int) $ticket->assignedUserId === (int) $user->id,
             'User' => (int) $ticket->userId === (int) $user->id,
             default => false,
         };
@@ -30,8 +31,21 @@ class TicketCommentController extends Controller
     {
         return match ($this->roleName($user)) {
             'Admin', 'Manager' => true,
-            'SupportAgent' => (int) $ticket->assignedUserId === (int) $user->id,
+            'SupportAgent' =>
+                (int) $ticket->assignedUserId === (int) $user->id,
             'User' => (int) $ticket->userId === (int) $user->id,
+            default => false,
+        };
+    }
+
+    private function canUseInternalNotes(
+        User $user,
+        Ticket $ticket
+    ): bool {
+        return match ($this->roleName($user)) {
+            'Admin', 'Manager' => true,
+            'SupportAgent' =>
+                (int) $ticket->assignedUserId === (int) $user->id,
             default => false,
         };
     }
@@ -44,31 +58,39 @@ class TicketCommentController extends Controller
         ], 403);
     }
 
-    public function index(Request $request, Ticket $ticket): JsonResponse
+    private function closedTicketResponse(): JsonResponse
     {
+        return response()->json([
+            'success' => false,
+            'message' => 'Comments on a Closed ticket cannot be changed.',
+        ], 422);
+    }
+
+    public function index(
+        Request $request,
+        Ticket $ticket
+    ): JsonResponse {
         /** @var User $user */
         $user = $request->user();
 
         if (!$this->canView($user, $ticket)) {
-            return $this->forbidden('You cannot view comments on this ticket.');
+            return $this->forbidden(
+                'You cannot view comments on this ticket.'
+            );
         }
+
+        $canViewInternal = $this->canUseInternalNotes(
+            $user,
+            $ticket
+        );
 
         $comments = $ticket->comments()
             ->with('user.role')
-                ->when(
-                    !(
-                        $this->roleName($user) === 'Admin'
-                        || (
-                            $this->roleName($user) === 'SupportAgent'
-                            && (int) $ticket->assignedUserId === (int) $user->id
-                        )
-                        || (
-                            $this->roleName($user) === 'User'
-                            && (int) $ticket->userId === (int) $user->id
-                        )
-                    ),
-                    fn ($query) => $query->where('isInternal', false)
-                )
+            ->when(
+                !$canViewInternal,
+                fn ($query) =>
+                    $query->where('isInternal', false)
+            )
             ->orderBy('createdAt')
             ->get();
 
@@ -78,13 +100,17 @@ class TicketCommentController extends Controller
         ]);
     }
 
-    public function store(Request $request, Ticket $ticket): JsonResponse
-    {
+    public function store(
+        Request $request,
+        Ticket $ticket
+    ): JsonResponse {
         /** @var User $user */
         $user = $request->user();
 
         if (!$this->canParticipate($user, $ticket)) {
-            return $this->forbidden('You cannot comment on this ticket.');
+            return $this->forbidden(
+                'You cannot comment on this ticket.'
+            );
         }
 
         $ticket->loadMissing('status');
@@ -92,7 +118,8 @@ class TicketCommentController extends Controller
         if ($ticket->status?->statusName === 'Closed') {
             return response()->json([
                 'success' => false,
-                'message' => 'Comments cannot be added to a Closed ticket.',
+                'message' =>
+                    'Comments cannot be added to a Closed ticket.',
             ], 422);
         }
 
@@ -101,19 +128,13 @@ class TicketCommentController extends Controller
             'isInternal' => ['sometimes', 'boolean'],
         ]);
 
-        $canCreateInternal = match ($this->roleName($user)) {
-            'Admin' => true,
-            'SupportAgent' => (int) $ticket->assignedUserId === (int) $user->id,
-            'User' => (int) $ticket->userId === (int) $user->id,
-            default => false,
-        };
-
         $comment = $ticket->comments()->create([
             'userId' => $user->id,
             'comment' => $validated['comment'],
-            'isInternal' => $canCreateInternal
-                ? ($validated['isInternal'] ?? false)
-                : false,
+            'isInternal' =>
+                $this->canUseInternalNotes($user, $ticket)
+                    ? ($validated['isInternal'] ?? false)
+                    : false,
         ]);
 
         return response()->json([
@@ -136,10 +157,22 @@ class TicketCommentController extends Controller
         $user = $request->user();
         $isAdmin = $this->roleName($user) === 'Admin';
 
-        if (!$isAdmin && (int) $comment->userId !== (int) $user->id) {
+        if (
+            !$isAdmin
+            && (
+                !$this->canParticipate($user, $ticket)
+                || (int) $comment->userId !== (int) $user->id
+            )
+        ) {
             return $this->forbidden(
-                'Only the comment author or an Admin can edit this comment.'
+                'Only the authorized comment author or an Admin '
+                . 'can edit this comment.'
             );
+        }
+
+        $ticket->loadMissing('status');
+        if ($ticket->status?->statusName === 'Closed') {
+            return $this->closedTicketResponse();
         }
 
         $validated = $request->validate([
@@ -147,7 +180,7 @@ class TicketCommentController extends Controller
             'isInternal' => ['sometimes', 'boolean'],
         ]);
 
-        if (!in_array($this->roleName($user), ['Admin', 'SupportAgent'], true)) {
+        if (!$this->canUseInternalNotes($user, $ticket)) {
             unset($validated['isInternal']);
         }
 
@@ -173,10 +206,22 @@ class TicketCommentController extends Controller
         $user = $request->user();
         $isAdmin = $this->roleName($user) === 'Admin';
 
-        if (!$isAdmin && (int) $comment->userId !== (int) $user->id) {
+        if (
+            !$isAdmin
+            && (
+                !$this->canParticipate($user, $ticket)
+                || (int) $comment->userId !== (int) $user->id
+            )
+        ) {
             return $this->forbidden(
-                'Only the comment author or an Admin can delete this comment.'
+                'Only the authorized comment author or an Admin '
+                . 'can delete this comment.'
             );
+        }
+
+        $ticket->loadMissing('status');
+        if ($ticket->status?->statusName === 'Closed') {
+            return $this->closedTicketResponse();
         }
 
         $comment->delete();

@@ -37,6 +37,9 @@ function TicketsPage() {
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
   const [category, setCategory] = useState("");
+  const [date, setDate] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDirection, setSortDirection] =
     useState("desc");
@@ -84,6 +87,9 @@ function TicketsPage() {
           status,
           priority,
           category,
+          date,
+          dateFrom,
+          dateTo,
           sortBy,
           sortDirection,
           perPage: 10,
@@ -130,6 +136,9 @@ function TicketsPage() {
       status,
       priority,
       category,
+      date,
+      dateFrom,
+      dateTo,
       sortBy,
       sortDirection,
     ]
@@ -154,6 +163,9 @@ function TicketsPage() {
     setStatus("");
     setPriority("");
     setCategory("");
+    setDate("");
+    setDateFrom("");
+    setDateTo("");
     setSortBy("createdAt");
     setSortDirection("desc");
   }
@@ -168,13 +180,28 @@ function TicketsPage() {
       return "—";
     }
 
-    return new Date(dateValue).toLocaleDateString(
+    return new Date(dateValue).toLocaleString(
       "en-GB",
       {
         day: "2-digit",
         month: "short",
         year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
       }
+    );
+  }
+
+  function isOverdue(ticket) {
+    if (!ticket?.dueAt) {
+      return false;
+    }
+
+    const statusName = ticket?.status?.statusName;
+
+    return (
+      !["Resolved", "Closed"].includes(statusName) &&
+      new Date(ticket.dueAt).getTime() < Date.now()
     );
   }
 
@@ -334,6 +361,54 @@ function TicketsPage() {
             ))}
           </select>
 
+          <label style={styles.dateField}>
+            <span style={styles.dateLabel}>Exact date</span>
+            <input
+              type="date"
+              value={date}
+              onChange={(event) => {
+                setDate(event.target.value);
+                if (event.target.value) {
+                  setDateFrom("");
+                  setDateTo("");
+                }
+              }}
+              style={styles.dateInput}
+            />
+          </label>
+
+          <label style={styles.dateField}>
+            <span style={styles.dateLabel}>From</span>
+            <input
+              type="date"
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={(event) => {
+                setDateFrom(event.target.value);
+                if (event.target.value) {
+                  setDate("");
+                }
+              }}
+              style={styles.dateInput}
+            />
+          </label>
+
+          <label style={styles.dateField}>
+            <span style={styles.dateLabel}>To</span>
+            <input
+              type="date"
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={(event) => {
+                setDateTo(event.target.value);
+                if (event.target.value) {
+                  setDate("");
+                }
+              }}
+              style={styles.dateInput}
+            />
+          </label>
+
           <select
             value={sortBy}
             onChange={(event) =>
@@ -435,7 +510,10 @@ function TicketsPage() {
               {search ||
               status ||
               priority ||
-              category
+              category ||
+              date ||
+              dateFrom ||
+              dateTo
                 ? "No tickets match the selected search or filters."
                 : "There are currently no tickets available."}
             </p>
@@ -478,6 +556,12 @@ function TicketsPage() {
                     </th>
                     <th style={styles.th}>
                       Created
+                    </th>
+                    <th style={styles.th}>
+                      Assigned At
+                    </th>
+                    <th style={styles.th}>
+                      Due At
                     </th>
                     <th style={styles.th}>
                       Action
@@ -543,6 +627,28 @@ function TicketsPage() {
                         <td style={styles.td}>
                           {formatDate(
                             ticket.createdAt
+                          )}
+                        </td>
+
+                        <td style={styles.td}>
+                          {formatDate(
+                            ticket.assignedAt
+                          )}
+                        </td>
+
+                        <td
+                          style={{
+                            ...styles.td,
+                            ...(isOverdue(ticket)
+                              ? styles.overdue
+                              : {}),
+                          }}
+                        >
+                          {formatDate(ticket.dueAt)}
+                          {isOverdue(ticket) && (
+                            <span style={styles.overdueBadge}>
+                              Overdue
+                            </span>
                           )}
                         </td>
 
@@ -722,6 +828,38 @@ const styles = {
     display: "flex",
     gap: "12px",
     flexWrap: "wrap",
+  },
+  overdue: {
+    color: "#b42318",
+    fontWeight: 700,
+  },
+  overdueBadge: {
+    display: "block",
+    width: "fit-content",
+    marginTop: "4px",
+    padding: "2px 7px",
+    borderRadius: "999px",
+    backgroundColor: "#fee4e2",
+    color: "#b42318",
+    fontSize: "11px",
+  },
+  dateField: {
+    display: "grid",
+    gap: "4px",
+    minWidth: "145px",
+  },
+  dateLabel: {
+    color: "#667085",
+    fontSize: "12px",
+    fontWeight: 700,
+  },
+  dateInput: {
+    minHeight: "42px",
+    padding: "8px 10px",
+    border: "1px solid #d0d5dd",
+    borderRadius: "8px",
+    backgroundColor: "#ffffff",
+    color: "#344054",
   },
 
   searchInput: {

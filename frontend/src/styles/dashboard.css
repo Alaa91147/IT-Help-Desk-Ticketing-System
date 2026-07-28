@@ -26,6 +26,22 @@ color:white;
 text-decoration:none;
 }
 
+.sidebar a.active{
+font-weight:700;
+color:#93c5fd;
+}
+
+.sidebar-logout{
+margin-top:20px;
+padding:0;
+border:0;
+background:transparent;
+color:#fca5a5;
+text-align:left;
+cursor:pointer;
+font:inherit;
+}
+
 .dashboard-main{
 flex:1;
 display:flex;
@@ -63,6 +79,38 @@ border-radius:12px;
 box-shadow:0 2px 10px rgba(0,0,0,.08);
 }
 
+.table-heading{
+display:flex;
+align-items:center;
+justify-content:space-between;
+gap:16px;
+}
+
+.table-link,
+.view-ticket-button{
+border:0;
+border-radius:7px;
+background:#2563eb;
+color:white;
+padding:8px 12px;
+font-weight:700;
+cursor:pointer;
+}
+
+.empty-table{
+padding:28px;
+text-align:center;
+color:#667085;
+}
+
+.dashboard-alert{
+margin-bottom:20px;
+padding:12px 16px;
+border-radius:8px;
+background:#fee4e2;
+color:#912018;
+}
+
 table{
 width:100%;
 border-collapse:collapse;
@@ -73,4 +121,39 @@ th,td{
 padding:15px;
 text-align:left;
 border-bottom:1px solid #eee;
+}
+
+@media (max-width:900px){
+.stats-grid{
+grid-template-columns:repeat(2,1fr);
+}
+
+.sidebar{
+width:190px;
+padding:22px;
+}
+}
+
+@media (max-width:650px){
+.dashboard{
+display:block;
+}
+
+.sidebar{
+width:100%;
+}
+
+.sidebar nav{
+flex-direction:row;
+flex-wrap:wrap;
+}
+
+.stats-grid{
+grid-template-columns:1fr;
+}
+
+.dashboard-content{
+padding:16px;
+overflow-x:auto;
+}
 }
