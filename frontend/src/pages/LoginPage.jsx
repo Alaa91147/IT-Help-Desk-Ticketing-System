@@ -60,7 +60,7 @@ function LoginPage() {
 
       const token = response?.data?.token;
       const user = response?.data?.user;
-
+      console.log("Logged in user:", user);
       if (!token || !user) {
         throw new Error("The server returned an invalid login response.");
       }
@@ -71,7 +71,18 @@ function LoginPage() {
         remember: formData.rememberMe,
       });
 
-      navigate("/dashboard", { replace: true });
+      const userRole =
+        user?.role?.roleName ||
+        user?.roleName ||
+        user?.role;
+
+      if (userRole === "Admin" || userRole === "Manager") {
+        navigate("/dashboard", { replace: true });
+      } else if (userRole === "SupportAgent" || userRole === "User") {
+        navigate("/tickets", { replace: true });
+      } else {
+        navigate("/login", { replace: true });
+      }
     } catch (error) {
       const backendErrors = error?.data?.errors;
 

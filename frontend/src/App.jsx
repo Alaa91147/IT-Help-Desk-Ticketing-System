@@ -6,6 +6,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import TicketsPage from "./pages/TicketsPage";
 import VerifyOtpPage from "./pages/VerifyOtpPage";
 
 function App() {
@@ -22,8 +23,19 @@ function App() {
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["Admin", "Manager"]}>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/tickets"
+        element={
+          <ProtectedRoute
+            allowedRoles={["Admin", "Manager", "SupportAgent", "User"]}
+          >
+            <TicketsPage />
           </ProtectedRoute>
         }
       />
