@@ -7,6 +7,7 @@ use App\Models\Status;
 use App\Models\Ticket;
 use App\Models\TicketAssignment;
 use App\Models\User;
+use App\Models\Priority;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,6 +20,23 @@ class TicketController extends Controller
     private const MANAGER = 'Manager';
     private const AGENT = 'SupportAgent';
     private const EMPLOYEE = 'User';
+
+    private function calculateDueAt(
+        Priority $priority,
+        mixed $startingAt = null
+    ): mixed {
+        $dueAt = $startingAt
+            ? $startingAt->copy()
+            : now();
+
+        return match (strtolower($priority->priorityName)) {
+            'critical' => $dueAt->addHours(4),
+            'high' => $dueAt->addDay(),
+            'medium' => $dueAt->addDays(3),
+            'low' => $dueAt->addDays(5),
+            default => $dueAt->addDays(3),
+        };
+    }
 
     private function roleName(User $user): ?string
     {
@@ -40,8 +58,7 @@ class TicketController extends Controller
         return match ($this->roleName($user)) {
             self::ADMIN, self::MANAGER => true,
             self::AGENT =>
-            (int) $ticket->assignedUserId === (int) $user->id
-            || in_array($ticket->status?->statusName, ['Open', 'Closed'], true),
+                (int) $ticket->assignedUserId === (int) $user->id,
             self::EMPLOYEE => (int) $ticket->userId === (int) $user->id,
             default => false,
         };
@@ -53,7 +70,11 @@ class TicketController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:100'],
             'priority' => ['nullable', 'string', 'max:100'],
-            'category' => ['nullable', 'string', 'max:100'],
+            'category' => [
+                'nullable',
+                'integer',
+                'exists:categories,id',
+            ],
             'date' => ['nullable', 'date'],
             'dateFrom' => ['nullable', 'date'],
             'dateTo' => ['nullable', 'date'],
@@ -70,6 +91,16 @@ class TicketController extends Controller
         $user = $request->user();
         $role = $this->roleName($user);
 
+        if (
+            isset($filters['dateFrom'], $filters['dateTo'])
+            && $filters['dateTo'] < $filters['dateFrom']
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'dateTo must be on or after dateFrom.',
+            ], 422);
+        }
+
         $tickets = Ticket::query()
             ->with([
                 'user',
@@ -77,21 +108,16 @@ class TicketController extends Controller
                 'category',
                 'priority',
                 'status',
-            ]);
+            ])
+            ->withMax(
+                'assignments as assignedAt',
+                'assignedAt'
+            );
 
         if ($role === self::EMPLOYEE) {
             $tickets->where('userId', $user->id);
         } elseif ($role === self::AGENT) {
-
-            $tickets->where(function (Builder $query) use ($user) {
-
-                $query->whereHas('status', function (Builder $status) {
-                    $status->whereIn('statusName', ['Open', 'Closed']);
-                })
-                ->orWhere('assignedUserId', $user->id);
-
-            });
-
+            $tickets->where('assignedUserId', $user->id);
         } elseif (!in_array($role, [self::ADMIN, self::MANAGER], true)) {
             return $this->forbidden();
         }
@@ -115,10 +141,8 @@ class TicketController extends Controller
                     $related->where('priorityName', $priority);
                 });
             })
-            ->when($filters['category'] ?? null, function (Builder $query, string $category): void {
-                $query->whereHas('category', function (Builder $related) use ($category): void {
-                    $related->where('categoryName', $category);
-                });
+            ->when($filters['category'] ?? null, function (Builder $query, int $categoryId): void {
+                $query->where('categoryId', $categoryId);
             })
             ->when($filters['date'] ?? null, function (Builder $query, string $date): void {
                 $query->whereDate('createdAt', $date);
@@ -163,6 +187,10 @@ class TicketController extends Controller
             'assignments.assignedUser',
             'assignments.assignedByUser',
         ]);
+        $ticket->loadMax(
+            'assignments as assignedAt',
+            'assignedAt'
+        );
 
         return response()->json([
             'success' => true,
@@ -187,6 +215,7 @@ class TicketController extends Controller
         ]);
 
         $openStatus = Status::where('statusName', 'Open')->firstOrFail();
+        $priority = Priority::findOrFail($validated['priorityId']);
 
         do {
             $ticketNumber = 'TCK-' . strtoupper(Str::random(8));
@@ -201,6 +230,7 @@ class TicketController extends Controller
             'statusId' => $openStatus->id,
             'subject' => $validated['subject'],
             'description' => $validated['description'],
+            'dueAt' => $this->calculateDueAt($priority),
         ]);
 
         return response()->json([
@@ -239,6 +269,14 @@ class TicketController extends Controller
             'subject' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string'],
         ]);
+
+        if ((int) $ticket->priorityId !== (int) $validated['priorityId']) {
+            $priority = Priority::findOrFail($validated['priorityId']);
+            $validated['dueAt'] = $this->calculateDueAt(
+                $priority,
+                $ticket->createdAt
+            );
+        }
 
         $ticket->update($validated);
 
