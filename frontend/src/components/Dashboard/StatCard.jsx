@@ -1,9 +1,15 @@
-function StatCard({ title, value }) {
+function StatCard({
+  title,
+  value,
+  detail,
+  tone = "default",
+}) {
   return (
-    <div className="stat-card">
-      <h3>{title}</h3>
-      <h1>{value}</h1>
-    </div>
+    <article className={`stat-card stat-${tone}`}>
+      <span>{title}</span>
+      <strong>{value}</strong>
+      {detail && <small>{detail}</small>}
+    </article>
   );
 }
 

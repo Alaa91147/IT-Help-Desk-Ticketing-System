@@ -23,12 +23,21 @@ class Ticket extends Model
         'subject',
         'description',
         'dueAt',
+        'startedAt',
+        'escalatedAt',
+        'cancelledAt',
+        'resolutionNote',
+        'escalationReason',
+        'cancellationReason',
         'resolvedAt',
         'closedAt',
     ];
 
     protected $casts = [
         'dueAt' => 'datetime',
+        'startedAt' => 'datetime',
+        'escalatedAt' => 'datetime',
+        'cancelledAt' => 'datetime',
         'resolvedAt' => 'datetime',
         'closedAt' => 'datetime',
         'createdAt' => 'datetime',
@@ -83,5 +92,10 @@ class Ticket extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(TicketAssignment::class, 'ticketId');
+    }
+
+    public function workSessions(): HasMany
+    {
+        return $this->hasMany(TicketWorkSession::class, 'ticketId');
     }
 }

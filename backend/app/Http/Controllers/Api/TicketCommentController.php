@@ -6,29 +6,54 @@ use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
+use App\Services\TicketActivityService;
+use App\Services\TicketNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class TicketCommentController extends Controller
 {
+    public function __construct(
+        private readonly TicketActivityService $activityService,
+        private readonly TicketNotificationService $notificationService
+    ) {
+    }
+
     private function roleName(User $user): ?string
     {
         return $user->loadMissing('role')->role?->roleName;
+    }
+
+    private function isHistoricalAgent(
+        User $user,
+        Ticket $ticket
+    ): bool {
+        if ($this->roleName($user) !== 'SupportAgent') {
+            return false;
+        }
+
+        return $ticket->assignments()
+            ->where('assignedUserId', $user->id)
+            ->exists()
+            || $ticket->workSessions()
+                ->where('userId', $user->id)
+                ->exists();
     }
 
     private function canView(User $user, Ticket $ticket): bool
     {
         return match ($this->roleName($user)) {
             'Admin', 'Manager' => true,
-            'SupportAgent' =>
-                (int) $ticket->assignedUserId === (int) $user->id,
+            'SupportAgent' => true,
             'User' => (int) $ticket->userId === (int) $user->id,
             default => false,
         };
     }
 
-    private function canParticipate(User $user, Ticket $ticket): bool
-    {
+    private function canParticipate(
+        User $user,
+        Ticket $ticket
+    ): bool {
         return match ($this->roleName($user)) {
             'Admin', 'Manager' => true,
             'SupportAgent' =>
@@ -38,7 +63,18 @@ class TicketCommentController extends Controller
         };
     }
 
-    private function canUseInternalNotes(
+    private function canViewInternalNotes(
+        User $user,
+        Ticket $ticket
+    ): bool {
+        return match ($this->roleName($user)) {
+            'Admin', 'Manager' => true,
+            'SupportAgent' => true,
+            default => false,
+        };
+    }
+
+    private function canCreateInternalNotes(
         User $user,
         Ticket $ticket
     ): bool {
@@ -58,12 +94,25 @@ class TicketCommentController extends Controller
         ], 403);
     }
 
-    private function closedTicketResponse(): JsonResponse
+    private function terminalTicketResponse(): JsonResponse
     {
         return response()->json([
             'success' => false,
-            'message' => 'Comments on a Closed ticket cannot be changed.',
+            'message' =>
+                'Comments on a Closed or Cancelled ticket '
+                . 'cannot be changed.',
         ], 422);
+    }
+
+    private function isTerminal(Ticket $ticket): bool
+    {
+        $ticket->loadMissing('status');
+
+        return in_array(
+            $ticket->status?->statusName,
+            ['Closed', 'Cancelled'],
+            true
+        );
     }
 
     public function index(
@@ -79,13 +128,31 @@ class TicketCommentController extends Controller
             );
         }
 
-        $canViewInternal = $this->canUseInternalNotes(
+        $canViewInternal = $this->canViewInternalNotes(
             $user,
             $ticket
         );
 
         $comments = $ticket->comments()
-            ->with('user.role')
+            ->whereNull('parentCommentId')
+            ->with([
+                'user.role',
+                'replies' => function ($query) use (
+                    $canViewInternal
+                ): void {
+                    $query
+                        ->when(
+                            !$canViewInternal,
+                            fn ($replyQuery) =>
+                                $replyQuery->where(
+                                    'isInternal',
+                                    false
+                                )
+                        )
+                        ->with('user.role')
+                        ->orderBy('createdAt');
+                },
+            ])
             ->when(
                 !$canViewInternal,
                 fn ($query) =>
@@ -113,34 +180,143 @@ class TicketCommentController extends Controller
             );
         }
 
-        $ticket->loadMissing('status');
-
-        if ($ticket->status?->statusName === 'Closed') {
-            return response()->json([
-                'success' => false,
-                'message' =>
-                    'Comments cannot be added to a Closed ticket.',
-            ], 422);
+        if ($this->isTerminal($ticket)) {
+            return $this->terminalTicketResponse();
         }
 
         $validated = $request->validate([
-            'comment' => ['required', 'string', 'max:5000'],
-            'isInternal' => ['sometimes', 'boolean'],
+            'comment' => [
+                'required',
+                'string',
+                'max:5000',
+            ],
+            'isInternal' => [
+                'sometimes',
+                'boolean',
+            ],
+            'parentCommentId' => [
+                'nullable',
+                'integer',
+                'exists:ticketcomments,id',
+            ],
         ]);
+
+        $parent = null;
+
+        if (!empty($validated['parentCommentId'])) {
+            $parent = TicketComment::query()
+                ->findOrFail($validated['parentCommentId']);
+
+            if (
+                (int) $parent->ticketId
+                !== (int) $ticket->id
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'The parent comment does not belong '
+                        . 'to this ticket.',
+                ], 422);
+            }
+
+            if (
+                $parent->parentCommentId !== null
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'Replies can only be added to a '
+                        . 'top-level comment.',
+                ], 422);
+            }
+
+            if (
+                $parent->isInternal
+                && !$this->canViewInternalNotes($user, $ticket)
+            ) {
+                return $this->forbidden(
+                    'You cannot reply to an internal note.'
+                );
+            }
+        }
+
+        $requestedInternal = (bool) (
+            $validated['isInternal'] ?? false
+        );
+
+        $isInternal = $parent?->isInternal
+            ?? (
+                $this->canCreateInternalNotes($user, $ticket)
+                    ? $requestedInternal
+                    : false
+            );
 
         $comment = $ticket->comments()->create([
             'userId' => $user->id,
             'comment' => $validated['comment'],
-            'isInternal' =>
-                $this->canUseInternalNotes($user, $ticket)
-                    ? ($validated['isInternal'] ?? false)
-                    : false,
+            'isInternal' => $isInternal,
+            'parentCommentId' => $parent?->id,
         ]);
+
+        $this->activityService->record(
+            $ticket,
+            $user,
+            $isInternal
+                ? 'internal_note_added'
+                : (
+                    $parent
+                        ? 'comment_reply_added'
+                        : 'comment_added'
+                ),
+            $isInternal
+                ? 'An internal note was added.'
+                : (
+                    $parent
+                        ? 'A reply was added to a ticket comment.'
+                        : 'A public ticket comment was added.'
+                ),
+            null,
+            [
+                'commentId' => $comment->id,
+                'parentCommentId' => $comment->parentCommentId,
+                'isInternal' => $comment->isInternal,
+            ],
+            $request->ip()
+        );
+
+        $recipientIds = collect([
+            $isInternal ? null : $ticket->userId,
+            $ticket->assignedUserId,
+        ])
+            ->filter()
+            ->unique()
+            ->reject(
+                fn (int $recipientId): bool =>
+                    (int) $recipientId === (int) $user->id
+            );
+
+        $recipients = User::query()
+            ->whereIn('id', $recipientIds)
+            ->where('isActive', true)
+            ->get();
+
+        foreach ($recipients as $recipient) {
+            $this->notificationService->commentAdded(
+                $ticket,
+                $recipient,
+                $user
+            );
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Comment added successfully.',
-            'data' => $comment->load('user.role'),
+            'message' => $parent
+                ? 'Reply added successfully.'
+                : 'Comment added successfully.',
+            'data' => $comment->load([
+                'user.role',
+                'parent.user.role',
+            ]),
         ], 201);
     }
 
@@ -149,7 +325,10 @@ class TicketCommentController extends Controller
         Ticket $ticket,
         TicketComment $comment
     ): JsonResponse {
-        if ((int) $comment->ticketId !== (int) $ticket->id) {
+        if (
+            (int) $comment->ticketId
+            !== (int) $ticket->id
+        ) {
             abort(404);
         }
 
@@ -161,35 +340,65 @@ class TicketCommentController extends Controller
             !$isAdmin
             && (
                 !$this->canParticipate($user, $ticket)
-                || (int) $comment->userId !== (int) $user->id
+                || (int) $comment->userId
+                    !== (int) $user->id
             )
         ) {
             return $this->forbidden(
-                'Only the authorized comment author or an Admin '
-                . 'can edit this comment.'
+                'Only the authorized comment author or an '
+                . 'Admin can edit this comment.'
             );
         }
 
-        $ticket->loadMissing('status');
-        if ($ticket->status?->statusName === 'Closed') {
-            return $this->closedTicketResponse();
+        if ($this->isTerminal($ticket)) {
+            return $this->terminalTicketResponse();
         }
 
         $validated = $request->validate([
-            'comment' => ['required', 'string', 'max:5000'],
-            'isInternal' => ['sometimes', 'boolean'],
+            'comment' => [
+                'required',
+                'string',
+                'max:5000',
+            ],
+            'isInternal' => [
+                'sometimes',
+                'boolean',
+            ],
         ]);
 
-        if (!$this->canUseInternalNotes($user, $ticket)) {
+        if (
+            !$this->canCreateInternalNotes($user, $ticket)
+            || $comment->parent?->isInternal
+        ) {
             unset($validated['isInternal']);
         }
 
+        $oldValues = [
+            'isInternal' => $comment->isInternal,
+        ];
+
         $comment->update($validated);
+
+        $this->activityService->record(
+            $ticket,
+            $user,
+            'comment_updated',
+            'A ticket comment was updated.',
+            $oldValues,
+            [
+                'commentId' => $comment->id,
+                'isInternal' => $comment->isInternal,
+            ],
+            $request->ip()
+        );
 
         return response()->json([
             'success' => true,
             'message' => 'Comment updated successfully.',
-            'data' => $comment->fresh('user.role'),
+            'data' => $comment->fresh([
+                'user.role',
+                'parent.user.role',
+            ]),
         ]);
     }
 
@@ -198,7 +407,10 @@ class TicketCommentController extends Controller
         Ticket $ticket,
         TicketComment $comment
     ): JsonResponse {
-        if ((int) $comment->ticketId !== (int) $ticket->id) {
+        if (
+            (int) $comment->ticketId
+            !== (int) $ticket->id
+        ) {
             abort(404);
         }
 
@@ -210,21 +422,39 @@ class TicketCommentController extends Controller
             !$isAdmin
             && (
                 !$this->canParticipate($user, $ticket)
-                || (int) $comment->userId !== (int) $user->id
+                || (int) $comment->userId
+                    !== (int) $user->id
             )
         ) {
             return $this->forbidden(
-                'Only the authorized comment author or an Admin '
-                . 'can delete this comment.'
+                'Only the authorized comment author or an '
+                . 'Admin can delete this comment.'
             );
         }
 
-        $ticket->loadMissing('status');
-        if ($ticket->status?->statusName === 'Closed') {
-            return $this->closedTicketResponse();
+        if ($this->isTerminal($ticket)) {
+            return $this->terminalTicketResponse();
         }
 
+        $commentId = $comment->id;
+        $isReply = $comment->parentCommentId !== null;
+
         $comment->delete();
+
+        $this->activityService->record(
+            $ticket,
+            $user,
+            'comment_deleted',
+            $isReply
+                ? 'A ticket comment reply was deleted.'
+                : 'A ticket comment was deleted.',
+            [
+                'commentId' => $commentId,
+                'wasReply' => $isReply,
+            ],
+            null,
+            $request->ip()
+        );
 
         return response()->json([
             'success' => true,

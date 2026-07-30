@@ -3,7 +3,10 @@ import { useAuth } from "../../context/AuthContext";
 
 function Sidebar() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+
+  const role =
+    user?.role?.roleName || user?.roleName || user?.role || "";
 
   async function handleLogout() {
     await logout();
@@ -12,7 +15,13 @@ function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <h2>HelpDesk</h2>
+      <div className="sidebar-brand">
+        <span>HD</span>
+        <div>
+          <strong>HelpDesk</strong>
+          <small>{role}</small>
+        </div>
+      </div>
 
       <nav>
         <NavLink to="/dashboard">Dashboard</NavLink>
