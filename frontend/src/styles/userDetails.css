@@ -1,0 +1,201 @@
+.user-details-container{
+    max-width:900px;
+    margin:0 auto;
+}
+
+.user-card{
+    background:#fff;
+    border:1px solid #e1e6ee;
+    border-radius:12px;
+    box-shadow:0 3px 12px rgb(16 24 40 / 4%);
+    padding:24px;
+}
+
+.user-card h2{
+    margin:0 0 20px;
+    font-size:24px;
+    color:#172033;
+}
+
+.user-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 0;
+    border-bottom:1px solid #eaecf0;
+}
+
+.user-row:last-child{
+    border-bottom:none;
+}
+
+.user-label{
+    color:#667085;
+    font-weight:700;
+}
+
+.user-value{
+    color:#172033;
+    font-weight:600;
+}
+
+.status-active{
+    color:#067647;
+    background:#dcfae6;
+    padding:4px 10px;
+    border-radius:999px;
+    font-weight:700;
+}
+
+.status-inactive{
+    color:#b42318;
+    background:#fee4e2;
+    padding:4px 10px;
+    border-radius:999px;
+    font-weight:700;
+}
+
+.deactivated-box{
+    margin-top:20px;
+    padding:16px;
+    border-radius:8px;
+    background:#fee4e2;
+    color:#912018;
+}
+
+.action-buttons{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-top:28px;
+}
+
+.action-buttons button{
+    min-width:170px;
+    padding:11px 18px;
+    border:none;
+    border-radius:8px;
+    font-weight:700;
+    transition:.2s;
+}
+
+.action-buttons button:hover{
+    transform:translateY(-1px);
+    filter:brightness(.96);
+}
+
+.edit-btn{
+    background:#2563eb;
+    color:white;
+}
+
+.role-btn{
+    background:#172337;
+    color:white;
+}
+
+.activate-btn{
+    background:#067647;
+    color:white;
+}
+
+.deactivate-btn{
+    background:#d92d20;
+    color:white;
+}
+
+.back-btn{
+    margin-bottom:18px;
+    border:none;
+    background:transparent;
+    color:#2563eb;
+    font-weight:700;
+}
+
+.back-btn:hover{
+    text-decoration:underline;
+}
+
+.role-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    z-index: 9999;
+}
+
+.role-modal {
+    width: 420px;
+    max-width: 90%;
+    background: #fff;
+
+    border-radius: 14px;
+    padding: 28px;
+
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.role-modal h2{
+    margin:0;
+    color:#172337;
+}
+
+.role-modal label{
+    font-weight:600;
+    color:#5d6b82;
+}
+
+.role-modal p{
+    margin:0;
+}
+
+.role-modal select{
+    width:100%;
+    padding:12px;
+    border:1px solid #d8dce5;
+    border-radius:8px;
+    font-size:15px;
+}
+
+.modal-buttons{
+    display:flex;
+    justify-content:flex-end;
+    gap:12px;
+    margin-top:10px;
+}
+
+.cancel-btn{
+    background:#eef2f7;
+    color:#172337;
+    border:none;
+    padding:12px 20px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+}
+
+.save-btn{
+    background:#2563eb;
+    color:white;
+    border:none;
+    padding:12px 20px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+}
+
+.save-btn:hover{
+    background:#1d4ed8;
+}
+
+.cancel-btn:hover{
+    background:#dde4ee;
+}

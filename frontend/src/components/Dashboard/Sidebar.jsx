@@ -23,17 +23,43 @@ function Sidebar() {
         </div>
       </div>
 
-      <nav>
-        <NavLink to="/dashboard">Dashboard</NavLink>
-        <NavLink to="/tickets">Tickets</NavLink>
+          <nav>
+
+        {(role === "Admin" || role === "Manager") && (
+            <NavLink to="/dashboard">
+                Dashboard
+            </NavLink>
+        )}
+
+        <NavLink to="/tickets">
+            Tickets
+        </NavLink>
+
+        {role === "User" && (
+            <NavLink to="/tickets/create">
+                Create Ticket
+            </NavLink>
+        )}
+
+        {role === "Admin" && (
+            <NavLink to="/users">
+                Users
+            </NavLink>
+        )}
+
+        <NavLink to="/profile">
+            Profile
+        </NavLink>
+
         <button
-          type="button"
-          className="sidebar-logout"
-          onClick={handleLogout}
+            type="button"
+            className="sidebar-logout"
+            onClick={handleLogout}
         >
-          Log out
+            Log out
         </button>
-      </nav>
+
+    </nav>
     </aside>
   );
 }

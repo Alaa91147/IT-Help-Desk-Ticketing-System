@@ -14,6 +14,9 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import TicketDetailsPage from "./pages/TicketDetailsPage";
 import TicketsPage from "./pages/TicketsPage";
 import VerifyOtpPage from "./pages/VerifyOtpPage";
+import ProfilePage from "./pages/ProfilePage";
+import UsersPage from "./pages/UsersPage";
+import UserDetailsPage from "./pages/UserDetailsPage";
 
 function App() {
   return (
@@ -88,28 +91,62 @@ function App() {
         }
       />
 
-      <Route
-        path="/tickets/:ticketId"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "Admin",
-              "Manager",
-              "SupportAgent",
-              "User",
-            ]}
-          >
-            <TicketDetailsPage />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/tickets/:ticketId"
+          element={
+            <ProtectedRoute
+              allowedRoles={[
+                "Admin",
+                "Manager",
+                "SupportAgent",
+                "User",
+              ]}
+            >
+              <TicketDetailsPage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="*"
-        element={
-          <Navigate to="/login" replace />
-        }
-      />
+        <Route
+            path="/profile"
+            element={
+                <ProtectedRoute
+                    allowedRoles={[
+                        "Admin",
+                        "Manager",
+                        "SupportAgent",
+                        "User",
+                    ]}
+                >
+                    <ProfilePage />
+                </ProtectedRoute>
+            }
+        />
+
+        <Route
+          path="/users"
+          element={
+              <ProtectedRoute
+                  allowedRoles={["Admin"]}
+              >
+                  <UsersPage />
+              </ProtectedRoute>
+          }
+          />
+                  <Route
+            path="/users/:id"
+            element={
+                <ProtectedRoute allowedRoles={["Admin"]}>
+                    <UserDetailsPage />
+                </ProtectedRoute>
+            }
+        />
+          <Route
+            path="*"
+            element={
+              <Navigate to="/login" replace />
+            }
+          />
     </Routes>
   );
 }

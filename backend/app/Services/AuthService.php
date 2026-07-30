@@ -13,13 +13,14 @@ use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use RuntimeException;
+use App\Services\RegistrationOtpService;
 
 class AuthService
 {
-    public function __construct(
-        private readonly RegistrationOtpService $otpService
-    ) {
-    }
+public function __construct(
+    private readonly RegistrationOtpService $otpService,
+) {
+}
 
     public function register(RegisterData $data): User
     {

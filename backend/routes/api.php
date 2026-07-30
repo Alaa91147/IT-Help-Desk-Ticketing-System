@@ -53,7 +53,14 @@ Route::prefix('auth')->group(function (): void {
             '/me',
             [AuthController::class, 'me']
         );
-
+        Route::patch(
+            '/me',
+            [AuthController::class, 'updateProfile']
+        );
+        Route::post(
+         '/me/verify-email-change',
+         [AuthController::class, 'verifyEmailChange']
+         );
         Route::post(
             '/logout',
             [AuthController::class, 'logout']
@@ -76,6 +83,14 @@ Route::middleware([
     'auth:sanctum',
     'role:Admin',
 ])->prefix('admin/users')->group(function (): void {
+        Route::get(
+        '/{user}',
+        [UserManagementController::class, 'show']
+    );
+    Route::patch(
+    '/{user}',
+    [UserManagementController::class, 'update']
+    );
     Route::get(
         '/',
         [UserManagementController::class, 'index']

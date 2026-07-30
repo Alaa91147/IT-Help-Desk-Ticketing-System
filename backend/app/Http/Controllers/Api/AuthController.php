@@ -16,6 +16,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Http\Requests\ForgotPasswordRequest;
 use App\Http\Requests\ResetPasswordRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -140,6 +143,105 @@ public function resetPassword(
     return ApiResponse::success(
         null,
         'Password reset successfully. You can now log in.'
+    );
+}
+public function updateProfile(Request $request): JsonResponse
+{
+    $user = $request->user();
+
+    $validated = $request->validate([
+        'firstName' => ['required', 'string', 'max:255'],
+        'lastName' => ['required', 'string', 'max:255'],
+
+        'email' => [
+            'required',
+            'email',
+            Rule::unique('users', 'email')->ignore($user->id),
+        ],
+
+        'phoneNumber' => ['nullable', 'string', 'max:30'],
+
+        'currentPassword' => ['nullable', 'string'],
+
+        'newPassword' => ['nullable', 'string', 'min:8'],
+
+        'confirmPassword' => ['nullable', 'same:newPassword'],
+    ]);
+
+$user->firstName = $validated['firstName'];
+$user->lastName = $validated['lastName'];
+$user->phoneNumber = $validated['phoneNumber'] ?? null;
+
+$emailChanged = $validated['email'] !== $user->email;
+
+if (!$emailChanged) {
+    $user->email = $validated['email'];
+}
+
+if (!empty($validated['newPassword'])) {
+
+    if (
+        !Hash::check(
+            $validated['currentPassword'] ?? '',
+            $user->password
+        )
+    ) {
+        throw ValidationException::withMessages([
+            'currentPassword' => [
+                'Current password is incorrect.',
+            ],
+        ]);
+    }
+
+    $user->password = Hash::make($validated['newPassword']);
+}
+
+$user->save();
+
+if ($emailChanged) {
+
+    app(\App\Services\ChangeEmailOtpService::class)
+        ->generateAndSend(
+            $user,
+            $validated['email']
+        );
+
+    return ApiResponse::success(
+        [
+            'user' => new UserResource($user->fresh()->load('role')),
+            'requiresEmailOtp' => true,
+        ],
+        'Profile updated. Verify your new email to complete the email change.'
+    );
+}
+
+return ApiResponse::success(
+    new UserResource($user->fresh()->load('role')),
+    'Profile updated successfully.'
+);
+}
+
+public function verifyEmailChange(Request $request): JsonResponse
+{
+    $request->validate([
+        'otp' => ['required', 'digits:6'],
+    ]);
+
+    $user = $request->user();
+
+    $newEmail = app(\App\Services\ChangeEmailOtpService::class)
+        ->verify(
+            $user,
+            $request->string('otp')->toString()
+        );
+
+    $user->email = $newEmail;
+    $user->emailVerifiedAt = now();
+    $user->save();
+
+    return ApiResponse::success(
+        new UserResource($user->fresh()->load('role')),
+        'Email updated successfully.'
     );
 }
 }

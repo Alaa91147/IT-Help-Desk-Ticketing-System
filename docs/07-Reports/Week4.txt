@@ -421,6 +421,22 @@ This correction allowed the frontend to display:
 - Complete activity timeline.
 - Effective working sessions.
 
+--------------------------------------------------
+10.1 USER PROFILE AND USER MANAGEMENT
+
+The following features were implemented:
+
+- Created the User Profile page.
+- Added profile update (First Name, Last Name, Phone Number).
+- Added Change Password functionality.
+- Added Change Email with OTP verification before updating the email.
+- Created the Admin Users page.
+- Displayed all users in a table.
+- Added View User.
+- Added Edit User.
+- Added Activate/Deactivate User.
+- Added Change User Role.
+- Connected the frontend with the backend APIs.
 
 11. SECURITY AND AUTHORIZATION
 ------------------------------
@@ -525,6 +541,12 @@ All required Week 4 objectives and tasks were completed:
 [Completed] Enforce realistic role permissions.
 [Completed] Connect the Laravel backend to the React frontend.
 [Completed] Add Manager analytics and reporting.
+[Completed] Create Admin Users management page.
+[Completed] Add user management actions (View, Edit, Activate/Deactivate, Change Role).
+[Completed] Create User Profile page.
+[Completed] Add profile update functionality.
+[Completed] Add Change Password.
+[Completed] Add Change Email with OTP verification.
 [Completed] Verify the backend with automated tests.
 [Completed] Verify the main workflows through the frontend.
 

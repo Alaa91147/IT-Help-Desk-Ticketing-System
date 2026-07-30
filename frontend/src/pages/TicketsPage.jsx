@@ -194,34 +194,41 @@ function TicketsPage() {
           </p>
         </div>
 
-        <div className="tickets-header-actions">
-          <NotificationBell />
+            <div className="tickets-header-actions">
+              <NotificationBell />
 
-          {canOpenDashboard && (
-            <button
-              className="button button-secondary"
-              onClick={() => navigate("/dashboard")}
-            >
-              Dashboard
-            </button>
-          )}
+              {canOpenDashboard && (
+                <button
+                  className="button button-secondary"
+                  onClick={() => navigate("/dashboard")}
+                >
+                  Dashboard
+                </button>
+              )}
 
-          {canCreate && (
-            <button
-              className="button button-primary"
-              onClick={() => navigate("/tickets/create")}
-            >
-              + Create ticket
-            </button>
-          )}
+              <button
+                className="button button-secondary"
+                onClick={() => navigate("/profile")}
+              >
+                👤 Profile
+              </button>
 
-          <button
-            className="button button-logout"
-            onClick={handleLogout}
-          >
-            Log out
-          </button>
-        </div>
+              {canCreate && (
+                <button
+                  className="button button-primary"
+                  onClick={() => navigate("/tickets/create")}
+                >
+                  + Create ticket
+                </button>
+              )}
+
+              <button
+                className="button button-logout"
+                onClick={handleLogout}
+              >
+                Log out
+              </button>
+            </div>
       </header>
 
       <section className="tickets-user-bar">

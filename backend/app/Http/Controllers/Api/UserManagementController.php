@@ -9,6 +9,9 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Models\Role;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class UserManagementController extends Controller
 {
@@ -101,6 +104,14 @@ class UserManagementController extends Controller
         );
     }
 
+    public function show(User $user): JsonResponse
+    {
+        return ApiResponse::success(
+            new UserResource($user->load('role')),
+            'User retrieved successfully.'
+        );
+    }
+
     public function updateRole(
     Request $request,
     User $user
@@ -144,6 +155,66 @@ class UserManagementController extends Controller
     return ApiResponse::success(
         new UserResource($user->load('role')),
         'User role updated successfully.'
+    );
+}
+public function update(Request $request, User $user): JsonResponse
+{
+
+        $validated = $request->validate([
+            'firstName' => ['required', 'string', 'max:255'],
+            'lastName' => ['required', 'string', 'max:255'],
+
+            'email' => [
+                'required',
+                'email',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
+
+            'phoneNumber' => ['nullable', 'string', 'max:30'],
+
+            'currentPassword' => ['nullable', 'string'],
+
+            'newPassword' => ['nullable', 'string', 'min:8'],
+
+            'confirmPassword' => ['nullable', 'same:newPassword'],
+        ]);
+
+    $user->firstName = $validated['firstName'];
+    $user->lastName = $validated['lastName'];
+    $user->email = $validated['email'];
+    $user->phoneNumber = $validated['phoneNumber'] ?? null;
+
+if (!empty($validated['newPassword'])) {
+
+    if ($request->user()->id !== $user->id) {
+        throw ValidationException::withMessages([
+            'password' => [
+                'You cannot change another user\'s password.',
+            ],
+        ]);
+    }
+
+    if (
+        !Hash::check(
+            $validated['currentPassword'] ?? '',
+            $user->password
+        )
+    ) {
+        throw ValidationException::withMessages([
+            'currentPassword' => [
+                'Current password is incorrect.',
+            ],
+        ]);
+    }
+
+    $user->password = Hash::make($validated['newPassword']);
+}
+
+    $user->save();
+
+    return ApiResponse::success(
+        new UserResource($user->fresh()->load('role')),
+        'User updated successfully.'
     );
 }
 }

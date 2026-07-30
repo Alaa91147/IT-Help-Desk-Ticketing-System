@@ -71,9 +71,44 @@ export function getCurrentUser(token) {
   });
 }
 
+export function updateProfile(profileData, token) {
+    return apiRequest("/auth/me", {
+        method: "PATCH",
+        token,
+        body: {
+            firstName: profileData.firstName,
+            lastName: profileData.lastName,
+            email: profileData.email,
+            phoneNumber: profileData.phoneNumber,
+
+            currentPassword: profileData.currentPassword,
+            newPassword: profileData.newPassword,
+            confirmPassword: profileData.confirmPassword,
+        },
+    });
+}
+
 export function logoutUser(token) {
   return apiRequest("/auth/logout", {
     method: "POST",
     token,
   });
+}
+
+export function verifyEmailChange(otp, token) {
+    return apiRequest("/auth/me/verify-email-change", {
+        method: "POST",
+        token,
+        body: {
+            otp,
+        },
+    });
+}
+
+export function sendEmailChange(profileData, token) {
+    return apiRequest("/auth/me", {
+        method: "PATCH",
+        token,
+        body: profileData,
+    });
 }
