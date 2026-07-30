@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PriorityController;
 use App\Http\Controllers\Api\StatusController;
 use App\Http\Controllers\Api\TicketAttachmentController;
@@ -70,6 +71,7 @@ Route::prefix('auth')->group(function (): void {
 | Admin User Management
 |--------------------------------------------------------------------------
 */
+
 Route::middleware([
     'auth:sanctum',
     'role:Admin',
@@ -143,11 +145,17 @@ Route::middleware([
 
 /*
 |--------------------------------------------------------------------------
-| Authenticated Lookup Endpoints
+| Authenticated Endpoints
 |--------------------------------------------------------------------------
 */
 
 Route::middleware('auth:sanctum')->group(function (): void {
+    /*
+    |--------------------------------------------------------------------------
+    | Lookups
+    |--------------------------------------------------------------------------
+    */
+
     Route::get(
         '/categories',
         [CategoryController::class, 'index']
@@ -186,6 +194,32 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get(
         '/manager/reports/tickets',
         [TicketController::class, 'ticketSummary']
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/notifications',
+        [NotificationController::class, 'index']
+    );
+
+    Route::patch(
+        '/notifications/read-all',
+        [NotificationController::class, 'markAllAsRead']
+    );
+
+    Route::patch(
+        '/notifications/{notification}/read',
+        [NotificationController::class, 'markAsRead']
+    );
+
+    Route::delete(
+        '/notifications/{notification}',
+        [NotificationController::class, 'destroy']
     );
 });
 
@@ -239,7 +273,12 @@ Route::middleware([
 Route::middleware('auth:sanctum')
     ->prefix('tickets')
     ->group(function (): void {
-        // Ticket CRUD
+        /*
+        |--------------------------------------------------------------------------
+        | Ticket CRUD
+        |--------------------------------------------------------------------------
+        */
+
         Route::get(
             '/',
             [TicketController::class, 'index']
@@ -265,7 +304,12 @@ Route::middleware('auth:sanctum')
             [TicketController::class, 'destroy']
         );
 
-        // Assignment and status workflow
+        /*
+        |--------------------------------------------------------------------------
+        | Assignment and Status Workflow
+        |--------------------------------------------------------------------------
+        */
+
         Route::patch(
             '/{ticket}/assign',
             [TicketController::class, 'assign']
@@ -276,6 +320,23 @@ Route::middleware('auth:sanctum')
             [TicketController::class, 'start']
         );
 
+                Route::patch(
+            '/{ticket}/pause',
+            [TicketController::class, 'pause']
+        );
+
+        Route::patch(
+            '/{ticket}/resume',
+            [TicketController::class, 'resume']
+        );
+                Route::patch(
+            '/{ticket}/escalate',
+            [TicketController::class, 'escalate']
+        );
+                Route::patch(
+            '/{ticket}/cancel',
+            [TicketController::class, 'cancel']
+        );
         Route::patch(
             '/{ticket}/resolve',
             [TicketController::class, 'resolve']
@@ -286,7 +347,12 @@ Route::middleware('auth:sanctum')
             [TicketController::class, 'close']
         );
 
-        // Comments
+        /*
+        |--------------------------------------------------------------------------
+        | Comments
+        |--------------------------------------------------------------------------
+        */
+
         Route::get(
             '/{ticket}/comments',
             [TicketCommentController::class, 'index']
@@ -307,7 +373,12 @@ Route::middleware('auth:sanctum')
             [TicketCommentController::class, 'destroy']
         );
 
-        // Attachments
+        /*
+        |--------------------------------------------------------------------------
+        | Attachments
+        |--------------------------------------------------------------------------
+        */
+
         Route::get(
             '/{ticket}/attachments',
             [TicketAttachmentController::class, 'index']

@@ -1,33 +1,136 @@
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useNavigate, useParams } from "react-router";
 
-import { getCategories, getPriorities } from "../api/lookupApi";
 import {
+  getCategories,
+  getPriorities,
+  getSupportAgents,
+} from "../api/lookupApi";
+import {
+  addTicketComment,
+  assignTicket,
+  cancelTicket,
+  closeTicket,
   deleteTicket,
+  deleteTicketAttachment,
+  downloadTicketAttachment,
+  escalateTicket,
+  getTicketAttachments,
   getTicketById,
+  getTicketComments,
+  pauseTicket,
+  resolveTicket,
+  resumeTicket,
+  startTicket,
   updateTicket,
+  uploadTicketAttachment,
 } from "../api/ticketApi";
 import { useAuth } from "../context/AuthContext";
+import "../styles/ticket-details.css";
 
-function extractArray(response) {
+function arrayFrom(response) {
   if (Array.isArray(response)) return response;
   if (Array.isArray(response?.data)) return response.data;
-  if (Array.isArray(response?.data?.data)) return response.data.data;
+  if (Array.isArray(response?.data?.data)) {
+    return response.data.data;
+  }
   return [];
 }
 
-function getRole(user) {
-  return user?.role?.roleName || user?.roleName || user?.role || "";
+function roleOf(user) {
+  return (
+    user?.role?.roleName ||
+    user?.roleName ||
+    user?.role ||
+    ""
+  );
 }
 
-function getPersonName(person) {
-  if (!person) return "Unassigned";
+function personName(person, fallback = "Unassigned") {
+  if (!person) return fallback;
+
   return (
     person.fullName ||
-    `${person.firstName || ""} ${person.lastName || ""}`.trim() ||
+    `${person.firstName || ""} ${
+      person.lastName || ""
+    }`.trim() ||
     person.email ||
-    "Unknown"
+    fallback
   );
+}
+
+function formatStatus(status) {
+  return status === "InProgress"
+    ? "In Progress"
+    : status || "Unknown";
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+
+  return new Date(value).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatDuration(totalSeconds) {
+  const seconds = Math.max(0, Number(totalSeconds) || 0);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${remainingSeconds}s`;
+  return `${remainingSeconds}s`;
+}
+
+function errorText(error, fallback) {
+  const errors = error?.data?.errors;
+  const firstValidationError = errors
+    ? Object.values(errors).flat()[0]
+    : null;
+
+  return firstValidationError || error?.message || fallback;
+}
+
+function normalizeTicket(ticket) {
+  if (!ticket) return ticket;
+
+  return {
+    ...ticket,
+    assignedUser:
+      ticket.assignedUser || ticket.assigned_user || null,
+    activityLogs:
+      ticket.activityLogs || ticket.activity_logs || [],
+    workSessions:
+      ticket.workSessions || ticket.work_sessions || [],
+    assignments: (ticket.assignments || []).map(
+      (assignment) => ({
+        ...assignment,
+        assignedUser:
+          assignment.assignedUser ||
+          assignment.assigned_user ||
+          null,
+        previousAssignedUser:
+          assignment.previousAssignedUser ||
+          assignment.previous_assigned_user ||
+          null,
+        assignedByUser:
+          assignment.assignedByUser ||
+          assignment.assigned_by_user ||
+          null,
+      })
+    ),
+  };
 }
 
 function TicketDetailsPage() {
@@ -36,448 +139,969 @@ function TicketDetailsPage() {
   const { token, user } = useAuth();
 
   const [ticket, setTicket] = useState(null);
+  const [metrics, setMetrics] = useState({});
+  const [permissions, setPermissions] = useState({});
+  const [comments, setComments] = useState([]);
+  const [attachments, setAttachments] = useState([]);
   const [categories, setCategories] = useState([]);
   const [priorities, setPriorities] = useState([]);
-  const [formData, setFormData] = useState({
+  const [agents, setAgents] = useState([]);
+
+  const [classification, setClassification] = useState({
     categoryId: "",
     priorityId: "",
-    subject: "",
-    description: "",
   });
-  const [isEditing, setIsEditing] = useState(false);
+  const [assignment, setAssignment] = useState({
+    assignedUserId: "",
+    reason: "",
+  });
+  const [workflowAction, setWorkflowAction] = useState("");
+  const [workflowNote, setWorkflowNote] = useState("");
+  const [commentText, setCommentText] = useState("");
+  const [isInternal, setIsInternal] = useState(false);
+  const [replyTo, setReplyTo] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isWorking, setIsWorking] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  async function loadTicket() {
+  const role = roleOf(user);
+  const statusName = ticket?.status?.statusName || "";
+  const isTerminal = ["Closed", "Cancelled"].includes(statusName);
+  const isOwner = Number(ticket?.userId) === Number(user?.id);
+  const isCurrentAgent =
+    role === "SupportAgent" &&
+    Number(ticket?.assignedUserId) === Number(user?.id);
+
+  const canManageAssignment = ["Admin", "Manager"].includes(role);
+  const canEditClassification =
+    role === "Admin" ||
+    (role === "User" && isOwner && statusName === "Open");
+  const canDelete =
+    role === "Admin" ||
+    (role === "User" && isOwner && statusName === "Open");
+  const canComment =
+    !isTerminal &&
+    (["Admin", "Manager"].includes(role) ||
+      isCurrentAgent ||
+      (role === "User" && isOwner));
+  const canUseInternal =
+    ["Admin", "Manager"].includes(role) || isCurrentAgent;
+  const canUpload =
+    !isTerminal &&
+    (role === "Admin" ||
+      isCurrentAgent ||
+      (role === "User" && isOwner));
+
+  const activeSession = metrics?.activeWorkSession;
+
+  const loadPage = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrorMessage("");
-      const response = await getTicketById(ticketId, token);
-      const loadedTicket = response?.data || null;
+
+      const ticketResponse = await getTicketById(
+        ticketId,
+        token
+      );
+
+      const loadedTicket = normalizeTicket(
+        ticketResponse?.data
+      );
       setTicket(loadedTicket);
-      setFormData({
-        categoryId: loadedTicket?.category?.id || loadedTicket?.categoryId || "",
-        priorityId: loadedTicket?.priority?.id || loadedTicket?.priorityId || "",
-        subject: loadedTicket?.subject || "",
-        description: loadedTicket?.description || "",
+      setMetrics(ticketResponse?.metrics || {});
+      setPermissions(ticketResponse?.permissions || {});
+      setClassification({
+        categoryId:
+          loadedTicket?.categoryId ||
+          loadedTicket?.category?.id ||
+          "",
+        priorityId:
+          loadedTicket?.priorityId ||
+          loadedTicket?.priority?.id ||
+          "",
       });
+      setAssignment({
+        assignedUserId: loadedTicket?.assignedUserId || "",
+        reason: "",
+      });
+
+      const [commentResponse, attachmentResponse] =
+        await Promise.all([
+          getTicketComments(ticketId, token),
+          getTicketAttachments(ticketId, token),
+        ]);
+
+      setComments(arrayFrom(commentResponse));
+      setAttachments(arrayFrom(attachmentResponse));
     } catch (error) {
-      setErrorMessage(error.message || "Unable to load ticket.");
+      setErrorMessage(
+        errorText(error, "Unable to load this ticket.")
+      );
     } finally {
       setIsLoading(false);
     }
-  }
-
-  useEffect(() => {
-    loadTicket();
-    // ticketId and token identify the requested protected resource.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId, token]);
 
-  async function beginEditing() {
-    setErrorMessage("");
-    setSuccessMessage("");
+  useEffect(() => {
+    loadPage();
+  }, [loadPage]);
+
+  useEffect(() => {
+    async function loadLookups() {
+      try {
+        const requests = [
+          getCategories(token),
+          getPriorities(token),
+        ];
+
+        if (["Admin", "Manager"].includes(role)) {
+          requests.push(getSupportAgents(token));
+        }
+
+        const responses = await Promise.all(requests);
+        setCategories(arrayFrom(responses[0]));
+        setPriorities(arrayFrom(responses[1]));
+
+        if (responses[2]) {
+          setAgents(arrayFrom(responses[2]));
+        }
+      } catch (error) {
+        setErrorMessage(
+          errorText(error, "Unable to load ticket options.")
+        );
+      }
+    }
+
+    loadLookups();
+  }, [role, token]);
+
+  const timeline = useMemo(() => {
+    return [...(ticket?.activityLogs || [])].sort(
+      (left, right) =>
+        new Date(left.createdAt) - new Date(right.createdAt)
+    );
+  }, [ticket]);
+
+  async function perform(action, successText) {
     try {
-      const [categoryResponse, priorityResponse] = await Promise.all([
-        getCategories(token),
-        getPriorities(token),
-      ]);
-      setCategories(extractArray(categoryResponse));
-      setPriorities(extractArray(priorityResponse));
-      setIsEditing(true);
+      setIsWorking(true);
+      setErrorMessage("");
+      await action();
+      setSuccessMessage(successText);
+      await loadPage();
     } catch (error) {
-      setErrorMessage(
-        error.message || "Unable to load the ticket form."
-      );
+      setErrorMessage(errorText(error, "Action failed."));
+    } finally {
+      setIsWorking(false);
     }
   }
 
-  async function handleUpdate(event) {
+  async function handleClassification(event) {
     event.preventDefault();
+
+    await perform(
+      () =>
+        updateTicket(
+          ticketId,
+          classification,
+          token
+        ),
+      "Ticket classification updated."
+    );
+  }
+
+  async function handleAssignment(event) {
+    event.preventDefault();
+
+    const isReassignment =
+      ticket?.assignedUserId &&
+      Number(ticket.assignedUserId) !==
+        Number(assignment.assignedUserId);
+
+    if (isReassignment && !assignment.reason.trim()) {
+      setErrorMessage(
+        "A reason is required when changing the assigned Agent."
+      );
+      return;
+    }
+
+    await perform(
+      () => assignTicket(ticketId, assignment, token),
+      isReassignment
+        ? "Ticket reassigned successfully."
+        : "Ticket assigned successfully."
+    );
+  }
+
+  async function handleWorkflow(event) {
+    event.preventDefault();
+
+    const note = workflowNote.trim();
+
     if (
-      !formData.categoryId ||
-      !formData.priorityId ||
-      !formData.subject.trim() ||
-      !formData.description.trim()
+      ["resolve", "escalate", "cancel"].includes(
+        workflowAction
+      ) &&
+      !note
     ) {
-      setErrorMessage("All ticket fields are required.");
+      setErrorMessage("A reason or note is required.");
+      return;
+    }
+
+    const actions = {
+      pause: () => pauseTicket(ticketId, note, token),
+      resolve: () => resolveTicket(ticketId, note, token),
+      escalate: () => escalateTicket(ticketId, note, token),
+      cancel: () => cancelTicket(ticketId, note, token),
+      close: () => closeTicket(ticketId, note, token),
+    };
+
+    if (!actions[workflowAction]) return;
+
+    await perform(
+      actions[workflowAction],
+      `Ticket ${workflowAction} action completed.`
+    );
+
+    setWorkflowAction("");
+    setWorkflowNote("");
+  }
+
+  async function handleComment(event) {
+    event.preventDefault();
+
+    if (!commentText.trim()) return;
+
+    await perform(
+      () =>
+        addTicketComment(
+          ticketId,
+          {
+            comment: commentText,
+            isInternal,
+            parentCommentId: replyTo?.id || null,
+          },
+          token
+        ),
+      replyTo ? "Reply added." : "Comment added."
+    );
+
+    setCommentText("");
+    setIsInternal(false);
+    setReplyTo(null);
+  }
+
+  async function handleUpload(event) {
+    event.preventDefault();
+
+    if (!selectedFile) {
+      setErrorMessage("Select a file first.");
+      return;
+    }
+
+    await perform(
+      () =>
+        uploadTicketAttachment(
+          ticketId,
+          selectedFile,
+          token
+        ),
+      "Attachment uploaded."
+    );
+
+    setSelectedFile(null);
+    event.target.reset();
+  }
+
+  async function handleDeleteTicket() {
+    if (!window.confirm("Delete this ticket permanently?")) {
       return;
     }
 
     try {
-      setIsSaving(true);
-      setErrorMessage("");
-      await updateTicket(ticketId, formData, token);
-      setSuccessMessage("Ticket updated successfully.");
-      setIsEditing(false);
-      await loadTicket();
-    } catch (error) {
-      const backendErrors = error?.data?.errors;
-      const firstValidationError = backendErrors
-        ? Object.values(backendErrors).flat()[0]
-        : null;
-      setErrorMessage(
-        firstValidationError ||
-          error.message ||
-          "Unable to update ticket."
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function handleDelete() {
-    const confirmed = window.confirm(
-      "Delete this ticket permanently? This action cannot be undone."
-    );
-    if (!confirmed) return;
-
-    try {
-      setIsSaving(true);
-      setErrorMessage("");
+      setIsWorking(true);
       await deleteTicket(ticketId, token);
-      navigate("/tickets", {
-        replace: true,
-        state: { message: "Ticket deleted successfully." },
-      });
+      navigate("/tickets", { replace: true });
     } catch (error) {
-      setErrorMessage(error.message || "Unable to delete ticket.");
-      setIsSaving(false);
+      setErrorMessage(errorText(error, "Unable to delete ticket."));
+      setIsWorking(false);
     }
   }
 
-  if (isLoading) {
-    return <div style={styles.centeredPage}>Loading ticket...</div>;
+  if (isLoading && !ticket) {
+    return <div className="ticket-loading">Loading ticket…</div>;
   }
 
-  if (errorMessage && !ticket) {
+  if (!ticket) {
     return (
-      <div style={styles.centeredPage}>
-        <div style={styles.card}>
+      <div className="ticket-loading">
+        <div>
           <h2>Unable to open ticket</h2>
-          <p style={styles.error}>{errorMessage}</p>
-          <button style={styles.primaryButton} onClick={() => navigate("/tickets")}>
-            Back to Tickets
+          <p>{errorMessage}</p>
+          <button onClick={() => navigate("/tickets")}>
+            Back to tickets
           </button>
         </div>
       </div>
     );
   }
 
-  const role = getRole(user);
-  const ownerId =
-    ticket?.user?.id || ticket?.createdByUser?.id || ticket?.userId;
-  const statusName =
-    ticket?.status?.statusName || ticket?.statusName || "Unknown";
-  const isOwner = Number(ownerId) === Number(user?.id);
-  const canModify =
-    role === "Admin" || (role === "User" && isOwner && statusName === "Open");
+  const workflowOptions = [];
+
+  if (
+    isCurrentAgent &&
+    statusName === "InProgress"
+  ) {
+    if (activeSession) {
+      workflowOptions.push(["pause", "Pause work"]);
+    }
+    workflowOptions.push(["resolve", "Resolve"]);
+    workflowOptions.push(["escalate", "Escalate"]);
+  }
+
+  if (
+    (role === "Admin" || role === "Manager") &&
+    !["Resolved", "Closed", "Cancelled"].includes(statusName)
+  ) {
+    workflowOptions.push(["cancel", "Cancel ticket"]);
+  }
+
+  if (
+    role === "User" &&
+    isOwner &&
+    statusName === "Open"
+  ) {
+    workflowOptions.push(["cancel", "Cancel ticket"]);
+  }
+
+  if (
+    ["Admin", "Manager"].includes(role) &&
+    statusName === "Resolved"
+  ) {
+    workflowOptions.push(["close", "Close ticket"]);
+  }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <button style={styles.backButton} onClick={() => navigate("/tickets")}>
-          ← Back to Tickets
-        </button>
+    <main className="ticket-details-page">
+      <div className="ticket-details-shell">
+        <div className="ticket-details-toolbar">
+          <button
+            className="link-button"
+            onClick={() => navigate("/tickets")}
+          >
+            ← Back to tickets
+          </button>
+          <span
+            className={`status-pill status-${statusName.toLowerCase()}`}
+          >
+            {formatStatus(statusName)}
+          </span>
+        </div>
 
-        {errorMessage && <div style={styles.errorAlert}>{errorMessage}</div>}
+        {errorMessage && (
+          <div className="alert alert-error">{errorMessage}</div>
+        )}
         {successMessage && (
-          <div style={styles.successAlert}>{successMessage}</div>
+          <div className="alert alert-success">
+            {successMessage}
+          </div>
         )}
 
-        <div style={styles.card}>
-          <div style={styles.header}>
-            <div>
-              <span style={styles.ticketNumber}>{ticket.ticketNumber}</span>
-              <h1 style={styles.title}>{ticket.subject}</h1>
+        {role === "SupportAgent" &&
+          permissions?.isReadOnlyAgent && (
+            <div className="alert alert-info">
+              You can review this ticket, but only the currently
+              assigned Agent can work on it.
             </div>
-            <span style={styles.statusBadge}>
-              {statusName === "InProgress" ? "In Progress" : statusName}
+          )}
+
+        <section className="ticket-hero card">
+          <div>
+            <span className="ticket-number">
+              {ticket.ticketNumber}
             </span>
+            <h1>{ticket.subject}</h1>
+            <p className="ticket-description">
+              {ticket.description}
+            </p>
           </div>
 
-          {isEditing ? (
-            <form style={styles.form} onSubmit={handleUpdate}>
-              <label style={styles.field}>
-                <span>Category</span>
-                <select
-                  value={formData.categoryId}
-                  onChange={(event) =>
-                    setFormData({ ...formData, categoryId: event.target.value })
-                  }
-                  style={styles.input}
-                  required
+          <dl className="ticket-facts">
+            <Fact
+              label="Created by"
+              value={personName(ticket.user)}
+            />
+            <Fact
+              label="Assigned to"
+              value={personName(ticket.assignedUser)}
+            />
+            <Fact
+              label="Category"
+              value={ticket.category?.categoryName || "—"}
+            />
+            <Fact
+              label="Priority"
+              value={ticket.priority?.priorityName || "—"}
+            />
+            <Fact
+              label="Created"
+              value={formatDate(ticket.createdAt)}
+            />
+            <Fact
+              label="Due"
+              value={formatDate(ticket.dueAt)}
+            />
+          </dl>
+        </section>
+
+        <section className="metrics-grid">
+          <Metric
+            label="Calendar duration"
+            value={formatDuration(
+              metrics.calendarDurationSeconds
+            )}
+          />
+          <Metric
+            label="Effective work"
+            value={formatDuration(
+              metrics.effectiveWorkSeconds
+            )}
+          />
+          <Metric
+            label="Agents involved"
+            value={metrics.agentsInvolved ?? 0}
+          />
+          <Metric
+            label="Reassignments"
+            value={metrics.reassignmentCount ?? 0}
+          />
+        </section>
+
+        <div className="ticket-columns">
+          <div className="ticket-main-column">
+            {canManageAssignment && !isTerminal && (
+              <section className="card section-card">
+                <h2>Assignment</h2>
+                <form
+                  className="stack-form"
+                  onSubmit={handleAssignment}
                 >
-                  <option value="">Select category</option>
-                  {categories.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.categoryName}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <label>
+                    Support Agent
+                    <select
+                      value={assignment.assignedUserId}
+                      onChange={(event) =>
+                        setAssignment((current) => ({
+                          ...current,
+                          assignedUserId: event.target.value,
+                        }))
+                      }
+                      required
+                    >
+                      <option value="">Choose an Agent</option>
+                      {agents.map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {personName(agent)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-              <label style={styles.field}>
-                <span>Priority</span>
-                <select
-                  value={formData.priorityId}
-                  onChange={(event) =>
-                    setFormData({ ...formData, priorityId: event.target.value })
-                  }
-                  style={styles.input}
-                  required
-                >
-                  <option value="">Select priority</option>
-                  {priorities.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.priorityName}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  {ticket.assignedUserId && (
+                    <label>
+                      Reassignment reason
+                      <textarea
+                        value={assignment.reason}
+                        onChange={(event) =>
+                          setAssignment((current) => ({
+                            ...current,
+                            reason: event.target.value,
+                          }))
+                        }
+                        rows="3"
+                        placeholder="Required when changing the Agent"
+                      />
+                    </label>
+                  )}
 
-              <label style={styles.field}>
-                <span>Subject</span>
-                <input
-                  value={formData.subject}
-                  maxLength={255}
-                  onChange={(event) =>
-                    setFormData({ ...formData, subject: event.target.value })
-                  }
-                  style={styles.input}
-                  required
-                />
-              </label>
-
-              <label style={styles.field}>
-                <span>Description</span>
-                <textarea
-                  value={formData.description}
-                  rows="7"
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      description: event.target.value,
-                    })
-                  }
-                  style={styles.input}
-                  required
-                />
-              </label>
-
-              <div style={styles.actions}>
-                <button
-                  type="submit"
-                  style={styles.primaryButton}
-                  disabled={isSaving}
-                >
-                  {isSaving ? "Saving..." : "Save Changes"}
-                </button>
-                <button
-                  type="button"
-                  style={styles.secondaryButton}
-                  onClick={() => setIsEditing(false)}
-                  disabled={isSaving}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          ) : (
-            <>
-              <div style={styles.grid}>
-                <Detail label="Created By" value={getPersonName(ticket.user)} />
-                <Detail
-                  label="Assigned To"
-                  value={getPersonName(ticket.assignedUser)}
-                />
-                <Detail
-                  label="Category"
-                  value={ticket?.category?.categoryName || "—"}
-                />
-                <Detail
-                  label="Priority"
-                  value={ticket?.priority?.priorityName || "—"}
-                />
-              </div>
-
-              <div style={styles.descriptionSection}>
-                <h2>Description</h2>
-                <p style={styles.description}>{ticket.description}</p>
-              </div>
-
-              {canModify && (
-                <div style={styles.actions}>
-                  <button style={styles.primaryButton} onClick={beginEditing}>
-                    Edit Ticket
-                  </button>
                   <button
-                    style={styles.deleteButton}
-                    onClick={handleDelete}
-                    disabled={isSaving}
+                    className="primary-button"
+                    disabled={isWorking}
                   >
-                    {isSaving ? "Deleting..." : "Delete Ticket"}
+                    {ticket.assignedUserId
+                      ? "Reassign ticket"
+                      : "Assign ticket"}
                   </button>
+                </form>
+              </section>
+            )}
+
+            {isCurrentAgent && statusName === "Assigned" && (
+              <section className="card action-card">
+                <div>
+                  <h2>Ready to begin?</h2>
+                  <p>
+                    Starting opens an effective-work timer for this
+                    ticket.
+                  </p>
+                </div>
+                <button
+                  className="primary-button"
+                  disabled={isWorking}
+                  onClick={() =>
+                    perform(
+                      () => startTicket(ticketId, token),
+                      "Work timer started."
+                    )
+                  }
+                >
+                  Start work
+                </button>
+              </section>
+            )}
+
+            {isCurrentAgent &&
+              statusName === "InProgress" &&
+              !activeSession && (
+                <section className="card action-card">
+                  <div>
+                    <h2>Work is paused</h2>
+                    <p>Resume to start a new timed session.</p>
+                  </div>
+                  <button
+                    className="primary-button"
+                    disabled={isWorking}
+                    onClick={() =>
+                      perform(
+                        () => resumeTicket(ticketId, token),
+                        "Work timer resumed."
+                      )
+                    }
+                  >
+                    Resume work
+                  </button>
+                </section>
+              )}
+
+            {workflowOptions.length > 0 && (
+              <section className="card section-card">
+                <h2>Workflow action</h2>
+                <form
+                  className="stack-form"
+                  onSubmit={handleWorkflow}
+                >
+                  <label>
+                    Action
+                    <select
+                      value={workflowAction}
+                      onChange={(event) => {
+                        setWorkflowAction(event.target.value);
+                        setWorkflowNote("");
+                      }}
+                      required
+                    >
+                      <option value="">Choose an action</option>
+                      {workflowOptions.map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {workflowAction && (
+                    <label>
+                      {workflowAction === "resolve"
+                        ? "Resolution note"
+                        : workflowAction === "close"
+                          ? "Closing note (optional)"
+                          : "Reason"}
+                      <textarea
+                        value={workflowNote}
+                        onChange={(event) =>
+                          setWorkflowNote(event.target.value)
+                        }
+                        rows="4"
+                        required={
+                          workflowAction !== "pause" &&
+                          workflowAction !== "close"
+                        }
+                      />
+                    </label>
+                  )}
+
+                  <button
+                    className="primary-button"
+                    disabled={isWorking || !workflowAction}
+                  >
+                    Confirm action
+                  </button>
+                </form>
+              </section>
+            )}
+
+            <section className="card section-card">
+              <h2>Discussion</h2>
+
+              <div className="comment-list">
+                {comments.length === 0 ? (
+                  <p className="muted">No comments yet.</p>
+                ) : (
+                  comments.map((comment) => (
+                    <Comment
+                      key={comment.id}
+                      comment={comment}
+                      canReply={canComment}
+                      onReply={setReplyTo}
+                    />
+                  ))
+                )}
+              </div>
+
+              {canComment && (
+                <form
+                  className="comment-form"
+                  onSubmit={handleComment}
+                >
+                  {replyTo && (
+                    <div className="reply-banner">
+                      Replying to {personName(replyTo.user)}
+                      <button
+                        type="button"
+                        onClick={() => setReplyTo(null)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+
+                  <textarea
+                    value={commentText}
+                    onChange={(event) =>
+                      setCommentText(event.target.value)
+                    }
+                    rows="4"
+                    placeholder={
+                      replyTo
+                        ? "Write a reply…"
+                        : "Add a comment…"
+                    }
+                    required
+                  />
+
+                  <div className="form-row">
+                    {canUseInternal && !replyTo && (
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={isInternal}
+                          onChange={(event) =>
+                            setIsInternal(event.target.checked)
+                          }
+                        />
+                        Internal note
+                      </label>
+                    )}
+
+                    <button
+                      className="primary-button"
+                      disabled={isWorking}
+                    >
+                      {replyTo ? "Send reply" : "Add comment"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </section>
+
+            <section className="card section-card">
+              <h2>Attachments</h2>
+
+              {attachments.length === 0 ? (
+                <p className="muted">No attachments.</p>
+              ) : (
+                <div className="attachment-list">
+                  {attachments.map((attachment) => {
+                    const canDeleteAttachment =
+                      !isTerminal &&
+                      (role === "Admin" ||
+                        (canUpload &&
+                          Number(attachment.uploadedByUserId) ===
+                            Number(user?.id)));
+
+                    return (
+                      <div
+                        className="attachment-row"
+                        key={attachment.id}
+                      >
+                        <div>
+                          <strong>{attachment.fileName}</strong>
+                          <span>
+                            {Math.ceil(
+                              Number(attachment.fileSize || 0) /
+                                1024
+                            )}{" "}
+                            KB
+                          </span>
+                        </div>
+                        <div>
+                          <button
+                            className="secondary-button"
+                            onClick={() =>
+                              downloadTicketAttachment(
+                                ticketId,
+                                attachment,
+                                token
+                              ).catch((error) =>
+                                setErrorMessage(
+                                  errorText(
+                                    error,
+                                    "Download failed."
+                                  )
+                                )
+                              )
+                            }
+                          >
+                            Download
+                          </button>
+                          {canDeleteAttachment && (
+                            <button
+                              className="danger-link"
+                              onClick={() =>
+                                perform(
+                                  () =>
+                                    deleteTicketAttachment(
+                                      ticketId,
+                                      attachment.id,
+                                      token
+                                    ),
+                                  "Attachment deleted."
+                                )
+                              }
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
-              {role === "User" && isOwner && statusName !== "Open" && (
-                <p style={styles.info}>
-                  This ticket can no longer be edited or deleted because work
-                  has started.
-                </p>
+              {canUpload && (
+                <form
+                  className="upload-form"
+                  onSubmit={handleUpload}
+                >
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
+                    onChange={(event) =>
+                      setSelectedFile(event.target.files?.[0] || null)
+                    }
+                    required
+                  />
+                  <button
+                    className="secondary-button"
+                    disabled={isWorking}
+                  >
+                    Upload
+                  </button>
+                </form>
               )}
-            </>
-          )}
+            </section>
+          </div>
+
+          <aside className="ticket-side-column">
+            {canEditClassification && (
+              <section className="card section-card">
+                <h2>Classification</h2>
+                <p className="muted">
+                  Subject and description cannot be edited.
+                </p>
+                <form
+                  className="stack-form"
+                  onSubmit={handleClassification}
+                >
+                  <label>
+                    Category
+                    <select
+                      value={classification.categoryId}
+                      onChange={(event) =>
+                        setClassification((current) => ({
+                          ...current,
+                          categoryId: event.target.value,
+                        }))
+                      }
+                      required
+                    >
+                      {categories.map((category) => (
+                        <option
+                          key={category.id}
+                          value={category.id}
+                        >
+                          {category.categoryName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Priority
+                    <select
+                      value={classification.priorityId}
+                      onChange={(event) =>
+                        setClassification((current) => ({
+                          ...current,
+                          priorityId: event.target.value,
+                        }))
+                      }
+                      required
+                    >
+                      {priorities.map((priority) => (
+                        <option
+                          key={priority.id}
+                          value={priority.id}
+                        >
+                          {priority.priorityName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="secondary-button"
+                    disabled={isWorking}
+                  >
+                    Update classification
+                  </button>
+                </form>
+              </section>
+            )}
+
+            <section className="card section-card">
+              <h2>Assignment history</h2>
+              {(ticket.assignments || []).length === 0 ? (
+                <p className="muted">Not assigned yet.</p>
+              ) : (
+                <div className="compact-timeline">
+                  {ticket.assignments.map((item) => (
+                    <div key={item.id}>
+                      <strong>
+                        {personName(item.assignedUser)}
+                      </strong>
+                      <span>{formatDate(item.assignedAt)}</span>
+                      <small>
+                        By {personName(item.assignedByUser)}
+                        {item.reason ? ` — ${item.reason}` : ""}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="card section-card">
+              <h2>Activity timeline</h2>
+              {timeline.length === 0 ? (
+                <p className="muted">No activity recorded.</p>
+              ) : (
+                <div className="compact-timeline">
+                  {timeline.map((item) => (
+                    <div key={item.id}>
+                      <strong>
+                        {item.action
+                          ?.replaceAll("_", " ")
+                          .replace(/\b\w/g, (letter) =>
+                            letter.toUpperCase()
+                          )}
+                      </strong>
+                      <span>{formatDate(item.createdAt)}</span>
+                      <small>{item.description}</small>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {canDelete && (
+              <section className="card danger-zone">
+                <h2>Danger zone</h2>
+                <p>Deletion permanently removes this ticket.</p>
+                <button
+                  className="danger-button"
+                  disabled={isWorking}
+                  onClick={handleDeleteTicket}
+                >
+                  Delete ticket
+                </button>
+              </section>
+            )}
+          </aside>
         </div>
       </div>
+    </main>
+  );
+}
+
+function Fact({ label, value }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
     </div>
   );
 }
 
-function Detail({ label, value }) {
+function Metric({ label, value }) {
   return (
-    <div style={styles.detailItem}>
-      <span style={styles.detailLabel}>{label}</span>
+    <div className="metric-card">
+      <span>{label}</span>
       <strong>{value}</strong>
     </div>
   );
 }
 
-const styles = {
-  page: {
-    minHeight: "100vh",
-    padding: "32px 20px",
-    backgroundColor: "#f4f7fb",
-    fontFamily: "Arial, sans-serif",
-  },
-  centeredPage: {
-    minHeight: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f4f7fb",
-  },
-  container: { maxWidth: "1000px", margin: "0 auto" },
-  card: {
-    padding: "32px",
-    border: "1px solid #e4e7ec",
-    borderRadius: "14px",
-    backgroundColor: "#fff",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "20px",
-    marginBottom: "28px",
-    flexWrap: "wrap",
-  },
-  ticketNumber: { color: "#2563eb", fontWeight: 700 },
-  title: { margin: "8px 0 0", color: "#172033" },
-  statusBadge: {
-    alignSelf: "flex-start",
-    padding: "7px 12px",
-    borderRadius: "20px",
-    backgroundColor: "#eef2ff",
-    color: "#3730a3",
-    fontWeight: 700,
-  },
-  backButton: {
-    marginBottom: "18px",
-    border: "none",
-    background: "transparent",
-    color: "#2563eb",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: "16px",
-  },
-  detailItem: {
-    padding: "16px",
-    border: "1px solid #eaecf0",
-    borderRadius: "10px",
-    backgroundColor: "#f9fafb",
-  },
-  detailLabel: {
-    display: "block",
-    marginBottom: "6px",
-    color: "#667085",
-    fontSize: "13px",
-  },
-  descriptionSection: {
-    marginTop: "28px",
-    paddingTop: "20px",
-    borderTop: "1px solid #eaecf0",
-  },
-  description: { lineHeight: 1.7, whiteSpace: "pre-wrap" },
-  form: { display: "grid", gap: "18px" },
-  field: { display: "grid", gap: "7px", fontWeight: 700 },
-  input: {
-    width: "100%",
-    padding: "11px",
-    border: "1px solid #cfd5df",
-    borderRadius: "8px",
-    font: "inherit",
-  },
-  actions: {
-    display: "flex",
-    gap: "12px",
-    marginTop: "24px",
-    flexWrap: "wrap",
-  },
-  primaryButton: {
-    padding: "11px 18px",
-    border: "none",
-    borderRadius: "8px",
-    backgroundColor: "#2563eb",
-    color: "#fff",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    padding: "11px 18px",
-    border: "1px solid #cfd5df",
-    borderRadius: "8px",
-    backgroundColor: "#fff",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  deleteButton: {
-    padding: "11px 18px",
-    border: "none",
-    borderRadius: "8px",
-    backgroundColor: "#b42318",
-    color: "#fff",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  errorAlert: {
-    marginBottom: "16px",
-    padding: "12px",
-    borderRadius: "8px",
-    backgroundColor: "#fee4e2",
-    color: "#912018",
-  },
-  successAlert: {
-    marginBottom: "16px",
-    padding: "12px",
-    borderRadius: "8px",
-    backgroundColor: "#dcfae6",
-    color: "#05603a",
-  },
-  error: { color: "#b42318" },
-  info: {
-    marginTop: "22px",
-    padding: "12px",
-    borderRadius: "8px",
-    backgroundColor: "#eff6ff",
-    color: "#1e40af",
-  },
-};
+function Comment({ comment, canReply, onReply }) {
+  const internal =
+    comment.isInternal ?? comment.is_internal ?? false;
+
+  return (
+    <article
+      className={`comment ${
+        internal ? "comment-internal" : ""
+      }`}
+    >
+      <div className="comment-header">
+        <div>
+          <strong>{personName(comment.user)}</strong>
+          {internal && <span>Internal note</span>}
+        </div>
+        <time>{formatDate(comment.createdAt)}</time>
+      </div>
+      <p>{comment.comment}</p>
+      {canReply && (
+        <button
+          className="link-button"
+          onClick={() => onReply(comment)}
+        >
+          Reply
+        </button>
+      )}
+
+      {(comment.replies || []).map((reply) => (
+        <div className="comment-reply" key={reply.id}>
+          <div className="comment-header">
+            <strong>{personName(reply.user)}</strong>
+            <time>{formatDate(reply.createdAt)}</time>
+          </div>
+          <p>{reply.comment}</p>
+        </div>
+      ))}
+    </article>
+  );
+}
 
 export default TicketDetailsPage;

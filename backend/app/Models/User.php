@@ -77,18 +77,12 @@ class User extends Authenticatable
 
     public function appNotifications(): HasMany
     {
-        return $this->hasMany(
-            Notification::class,
-            'userId'
-        );
+        return $this->hasMany(Notification::class, 'userId');
     }
 
     public function activityLogs(): HasMany
     {
-        return $this->hasMany(
-            ActivityLog::class,
-            'userId'
-        );
+        return $this->hasMany(ActivityLog::class, 'userId');
     }
 
     public function receivedAssignments(): HasMany
@@ -99,12 +93,25 @@ class User extends Authenticatable
         );
     }
 
+    public function previousAssignments(): HasMany
+    {
+        return $this->hasMany(
+            TicketAssignment::class,
+            'previousAssignedUserId'
+        );
+    }
+
     public function createdAssignments(): HasMany
     {
         return $this->hasMany(
             TicketAssignment::class,
             'assignedByUserId'
         );
+    }
+
+    public function ticketWorkSessions(): HasMany
+    {
+        return $this->hasMany(TicketWorkSession::class, 'userId');
     }
 
     public function hasVerifiedEmail(): bool

@@ -14,8 +14,11 @@ class TicketAssignment extends Model
 
     protected $fillable = [
         'ticketId',
+        'previousAssignedUserId',
         'assignedUserId',
         'assignedByUserId',
+        'assignmentType',
+        'reason',
         'assignedAt',
     ];
 
@@ -28,6 +31,14 @@ class TicketAssignment extends Model
     public function ticket(): BelongsTo
     {
         return $this->belongsTo(Ticket::class, 'ticketId');
+    }
+
+    public function previousAssignedUser(): BelongsTo
+    {
+        return $this->belongsTo(
+            User::class,
+            'previousAssignedUserId'
+        );
     }
 
     public function assignedUser(): BelongsTo

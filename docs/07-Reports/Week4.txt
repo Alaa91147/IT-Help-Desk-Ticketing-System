@@ -1,0 +1,532 @@
+IT HELP DESK TICKETING SYSTEM
+WEEK 4 COMPLETION REPORT
+==============================
+
+Week 4 Title:
+Ticket Assignment, Workflow, Comments, History, Activity Tracking,
+Work-Time Tracking, and Notifications
+
+
+1. WEEK 4 OBJECTIVES
+--------------------
+
+The objectives completed during Week 4 were:
+
+- Build a complete ticket assignment system.
+- Add realistic ticket workflow and status-transition logic.
+- Add comments and nested replies.
+- Add private internal notes.
+- Track ticket assignment history.
+- Track the complete activity timeline for every ticket.
+- Record the effective time an IT Support Agent spends working.
+- Notify users when important ticket events occur.
+- Enforce realistic role-based permissions in the backend and frontend.
+- Provide Manager/Admin analysis of ticket workload and performance.
+
+
+2. USER ROLES AND PERMISSIONS
+-----------------------------
+
+2.1 Employee / User
+
+An Employee can:
+
+- Create a new ticket.
+- View their own tickets.
+- View public comments and replies on their tickets.
+- Add public comments and replies to their tickets.
+- Upload and download permitted attachments.
+- Cancel their own ticket while it is still Open.
+- Receive updates about their ticket.
+
+An Employee cannot:
+
+- View another employee's tickets.
+- Assign or reassign tickets.
+- Start, pause, resume, resolve, escalate, or close a ticket.
+- Create or view private internal notes.
+- Edit the ticket title or description after creation.
+- Modify a ticket after it has entered the assignment workflow.
+
+
+2.2 IT Support Agent
+
+An IT Support Agent can:
+
+- View all tickets.
+- See which tickets are assigned to them.
+- Open unassigned or other-agent tickets in read-only mode.
+- Work only on tickets currently assigned to them.
+- Start, pause, and resume work.
+- Resolve an assigned ticket with a resolution note.
+- Escalate an assigned ticket with a required reason.
+- Add public comments and replies to an assigned ticket.
+- Add and view internal notes when authorized.
+- Upload and download permitted attachments.
+- View the ticket timeline, assignment history, and work metrics.
+- Receive a notification when assigned a ticket.
+
+An IT Support Agent cannot:
+
+- Create tickets.
+- Assign or reassign tickets.
+- Modify a ticket assigned to another agent.
+- Continue working after reassignment.
+- Change the ticket title or description.
+- Close a ticket using Manager/Admin authority.
+
+
+2.3 Manager
+
+A Manager can:
+
+- View all tickets.
+- View ticket reports and operational analytics.
+- Assign an Open ticket to an active Support Agent.
+- Reassign a ticket to another Support Agent.
+- Provide a reassignment reason.
+- View the complete assignment history.
+- View the activity timeline and audit information.
+- View agent workload and effective working time.
+- Add public comments, replies, and internal notes.
+- Close or cancel tickets when permitted by the workflow.
+- Receive escalated tickets for review and reassignment.
+
+A Manager cannot:
+
+- Create a ticket.
+- Change the immutable ticket title or description.
+- Perform Support Agent work-session actions unless explicitly authorized.
+
+
+2.4 Administrator
+
+An Administrator can:
+
+- Create tickets.
+- View all tickets.
+- Assign and reassign tickets.
+- Manage ticket classifications where permitted.
+- View reports, assignment history, and activity logs.
+- Add public comments, replies, and internal notes.
+- Manage attachments according to authorization rules.
+- Close or cancel tickets.
+- Manage users, roles, categories, and priorities.
+
+The Administrator cannot change the immutable ticket title or description
+after the ticket has been created.
+
+
+3. TICKET WORKFLOW
+------------------
+
+The implemented ticket lifecycle is:
+
+Open
+  -> Assigned
+  -> In Progress
+  -> Resolved
+  -> Closed
+
+Additional paths:
+
+In Progress
+  -> Paused
+  -> In Progress
+
+In Progress
+  -> Escalated
+  -> Reviewed by Manager/Admin
+  -> Reassigned
+  -> Assigned
+  -> In Progress
+
+Open
+  -> Cancelled
+
+
+3.1 Open
+
+- The ticket has been created.
+- Its original title and description are stored permanently.
+- An authorized Manager/Admin may assign it.
+- The owning Employee may cancel it with a reason while allowed.
+
+
+3.2 Assigned
+
+- A Support Agent has been selected.
+- The current assigned-agent ID is stored on the ticket.
+- The assignment date and time are recorded.
+- The assigning user is recorded.
+- An assignment-history record is created.
+- An activity-log record is created.
+- The assigned Support Agent receives a notification.
+
+
+3.3 In Progress
+
+- The assigned Support Agent starts work.
+- The ticket status changes to In Progress.
+- A work session starts.
+- The start date and time are recorded.
+- Status-change and work-started activities are logged.
+
+
+3.4 Paused and Resumed
+
+- The assigned agent may pause an active work session.
+- The session end time and effective duration are recorded.
+- Paused time is excluded from effective working time.
+- The agent may resume work, which creates a new active session.
+- Pause and resume events appear in the ticket activity timeline.
+
+
+3.5 Resolved
+
+- Only the current assigned agent can resolve the ticket.
+- A resolution note is required.
+- Any active work session is stopped.
+- The resolution date and time are recorded.
+- The effective working duration remains available for reports.
+- The status change and resolution appear in the activity log.
+
+
+3.6 Closed
+
+- An authorized Manager/Admin can close a completed ticket.
+- The closure date and time are recorded.
+- The total calendar duration can be calculated from creation to closure.
+- The final closure action is stored in the audit trail.
+- Comments and attachments can no longer be changed after closure.
+
+
+3.7 Escalated
+
+- The current assigned Support Agent may escalate a ticket.
+- An escalation reason is required.
+- Active work is stopped.
+- Managers/Admins are notified.
+- The ticket becomes available for review and reassignment.
+- Escalation is stored in the ticket history and activity log.
+
+
+3.8 Cancelled
+
+- Cancellation requires a reason.
+- The cancellation date and time are recorded.
+- Active work is stopped when necessary.
+- The reason and actor are stored in the audit trail.
+- A cancelled ticket becomes read-only.
+
+
+4. ASSIGNMENT AND REASSIGNMENT
+------------------------------
+
+The assignment system records:
+
+- Ticket ID.
+- Current assigned Support Agent.
+- Previous assigned Support Agent during reassignment.
+- User who performed the assignment.
+- Assignment type: assigned or reassigned.
+- Assignment/reassignment reason.
+- Exact assignment date and time.
+
+Every assignment or reassignment:
+
+- Updates the ticket's current assigned agent.
+- Adds a TicketAssignment history record.
+- Adds an ActivityLog record.
+- Notifies the newly assigned Support Agent.
+- Preserves previous-agent history.
+
+A historical agent may still view a ticket when permitted, but cannot
+continue working after the ticket has been reassigned.
+
+
+5. COMMENTS, REPLIES, AND INTERNAL NOTES
+----------------------------------------
+
+Public comments:
+
+- Authorized participants can add comments.
+- Public comments are visible to the ticket owner and authorized staff.
+- The author and creation date/time are displayed.
+- Comment creation is included in the activity log.
+
+Replies:
+
+- A comment can reference a parent comment.
+- Replies are displayed under the original comment.
+- The reply author and date/time are recorded.
+- Reply creation is included in the activity log.
+
+Internal notes:
+
+- Admins, Managers, and authorized Support Agents can create internal notes.
+- Employees cannot create internal notes.
+- Employees cannot see internal notes.
+- Internal notes are clearly labelled in the frontend.
+- Internal-note creation is recorded in the activity log.
+
+Terminal-ticket protection:
+
+- Comments cannot be added or modified after a ticket is Closed.
+- Authorization is rechecked for every comment operation.
+
+
+6. ACTIVITY LOG AND AUDIT TRAIL
+-------------------------------
+
+Each ticket has its own activity timeline.
+
+Recorded activities include:
+
+- Ticket creation.
+- Ticket assignment.
+- Ticket reassignment.
+- Status changes.
+- Work started.
+- Work paused.
+- Work resumed.
+- Ticket resolved.
+- Ticket escalated.
+- Ticket cancelled.
+- Ticket closed.
+- Public comment added.
+- Comment reply added.
+- Internal note added.
+- Attachment uploaded or deleted where applicable.
+
+Each activity record may contain:
+
+- Acting user.
+- Ticket ID.
+- Action name.
+- Human-readable description.
+- Old values.
+- New values.
+- IP address.
+- Exact creation date and time.
+
+This provides an audit trail showing what changed, who changed it, and when.
+
+
+7. WORK-SESSION AND TIME TRACKING
+---------------------------------
+
+The work-session system tracks the real time spent by Support Agents.
+
+Each work session contains:
+
+- Ticket ID.
+- Agent ID.
+- Start date and time.
+- End date and time.
+- Effective duration in seconds.
+- Stop reason, such as paused, resolved, escalated, cancelled, or reassigned.
+
+Two different measurements are provided:
+
+1. Calendar duration
+   Time from ticket creation until resolution, cancellation, closure,
+   or the current time.
+
+2. Effective work duration
+   Total time from actual agent work sessions, excluding paused time.
+
+The system also calculates:
+
+- Number of agents involved.
+- Number of assignments.
+- Number of reassignments.
+- Whether an active work session exists.
+- Average resolution time for management reporting.
+
+
+8. NOTIFICATIONS
+----------------
+
+The notification system includes:
+
+- Notification creation when an agent receives an assignment.
+- Notifications for important workflow events where applicable.
+- Notification bell in the frontend.
+- Unread-notification counter.
+- List of the authenticated user's notifications.
+- Mark one notification as read.
+- Mark all notifications as read.
+- Delete a notification.
+- Protection preventing users from reading another user's notification.
+
+
+9. MANAGER DASHBOARD AND ANALYTICS
+----------------------------------
+
+The operations dashboard displays:
+
+- Total tickets.
+- Unassigned tickets.
+- Overdue tickets.
+- Escalated tickets.
+- Cancelled tickets.
+- Number of reassignments.
+- Total effective work.
+- Average resolution time.
+- Ticket distribution by status.
+- Ticket distribution by category.
+- Agent workload.
+- Current assignments per agent.
+- Tickets currently in progress.
+- Resolved-ticket count.
+- Assignment-history count.
+- Work-session count.
+- Effective work per agent.
+- Recent tickets.
+- Optional date-range filtering.
+
+
+10. FRONTEND INTEGRATION
+------------------------
+
+The React frontend was connected to the Laravel APIs for:
+
+- Ticket listing and filtering.
+- Ticket details.
+- Assignment and reassignment.
+- Workflow actions.
+- Comments and replies.
+- Internal notes.
+- Attachments.
+- Notifications.
+- Manager reports and analytics.
+- Activity timeline.
+- Assignment history.
+- Work-session metrics.
+
+Laravel snake_case relationship responses were normalized in React, including:
+
+- assigned_user.
+- activity_logs.
+- work_sessions.
+- assigned_by_user.
+- previous_assigned_user.
+
+This correction allowed the frontend to display:
+
+- The exact assigned Support Agent.
+- The user who performed the assignment.
+- Complete assignment history.
+- Complete activity timeline.
+- Effective working sessions.
+
+
+11. SECURITY AND AUTHORIZATION
+------------------------------
+
+Security is enforced in the Laravel backend, not only through hidden
+frontend buttons.
+
+Implemented controls include:
+
+- Sanctum authentication.
+- Role-based authorization.
+- Ticket ownership checks.
+- Current-assignee checks.
+- Read-only access for non-assigned agents.
+- Internal-note privacy.
+- Notification ownership checks.
+- Attachment authorization.
+- Immutable title and description.
+- Closed/cancelled ticket protection.
+- Validation of assignment targets.
+- Required workflow reasons and resolution notes.
+
+
+12. DATABASE CHANGES
+--------------------
+
+Week 4 added or extended database support for:
+
+- Workflow dates and reasons on tickets.
+- Previous-agent and reassignment information.
+- Parent comments for replies.
+- Notification types.
+- Ticket work sessions.
+- Assignment history.
+- Activity logs.
+
+The related Eloquent models and relationships were updated.
+
+
+13. TESTING COMPLETED
+---------------------
+
+Backend feature tests covered:
+
+- Employee ticket visibility.
+- Support Agent ticket visibility.
+- Manager assignment.
+- Unauthorized assignment rejection.
+- Assigned -> In Progress -> Resolved -> Closed workflow.
+- Protection from editing immutable ticket data.
+- Manager/Admin report authorization.
+- Internal-note privacy.
+- Attachment authorization.
+- Admin role management.
+- Assignment and reassignment history.
+- Assignment notifications.
+- Work-session pause/resume/resolve behavior.
+- Escalation with a required reason.
+- Cancellation authorization and reason.
+- Historical-agent read-only behavior.
+- Comment replies.
+- Notification ownership protection.
+
+Final recorded backend result:
+
+- 20 tests passed.
+- 108 assertions passed.
+
+Frontend verification included:
+
+- Successful production build.
+- Ticket assignment display.
+- Assignment-history display.
+- Activity-timeline display.
+- Notification workflow.
+- Workflow-action controls.
+- Public comments.
+- Nested replies.
+- Internal-note visibility for authorized staff.
+- Internal-note privacy for Employees.
+- Manager dashboard and ticket analytics.
+
+
+14. FINAL WEEK 4 STATUS
+-----------------------
+
+All required Week 4 objectives and tasks were completed:
+
+[Completed] Build ticket assignment system.
+[Completed] Add ticket workflow logic.
+[Completed] Assign and reassign tickets to Support Agents.
+[Completed] Update and validate ticket statuses.
+[Completed] Add public comments.
+[Completed] Add nested replies.
+[Completed] Add private internal notes.
+[Completed] Create ticket activity logs.
+[Completed] Display a ticket status timeline.
+[Completed] Preserve ticket assignment history.
+[Completed] Provide a complete audit trail.
+[Completed] Track effective Support Agent working time.
+[Completed] Create assignment notifications.
+[Completed] Enforce realistic role permissions.
+[Completed] Connect the Laravel backend to the React frontend.
+[Completed] Add Manager analytics and reporting.
+[Completed] Verify the backend with automated tests.
+[Completed] Verify the main workflows through the frontend.
+
+Week 4 is complete and ready for final Git review, commit, push, and
+pull-request/merge preparation.

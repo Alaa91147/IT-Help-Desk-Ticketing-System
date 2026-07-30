@@ -4,11 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class TicketComment extends Model
+class TicketWorkSession extends Model
 {
-    protected $table = 'ticketcomments';
+    protected $table = 'ticketworksessions';
 
     public const CREATED_AT = 'createdAt';
     public const UPDATED_AT = 'updatedAt';
@@ -16,13 +15,16 @@ class TicketComment extends Model
     protected $fillable = [
         'ticketId',
         'userId',
-        'parentCommentId',
-        'comment',
-        'isInternal',
+        'startedAt',
+        'endedAt',
+        'durationSeconds',
+        'stopReason',
     ];
 
     protected $casts = [
-        'isInternal' => 'boolean',
+        'startedAt' => 'datetime',
+        'endedAt' => 'datetime',
+        'durationSeconds' => 'integer',
         'createdAt' => 'datetime',
         'updatedAt' => 'datetime',
     ];
@@ -37,19 +39,8 @@ class TicketComment extends Model
         return $this->belongsTo(User::class, 'userId');
     }
 
-    public function parent(): BelongsTo
+    public function isActive(): bool
     {
-        return $this->belongsTo(
-            TicketComment::class,
-            'parentCommentId'
-        );
-    }
-
-    public function replies(): HasMany
-    {
-        return $this->hasMany(
-            TicketComment::class,
-            'parentCommentId'
-        )->orderBy('createdAt');
+        return $this->endedAt === null;
     }
 }

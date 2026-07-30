@@ -58,14 +58,16 @@ class TicketManagementTest extends TestCase
             ->firstOrFail();
 
         return Ticket::query()->create([
-            'ticketNumber' => 'TCK-' . fake()->unique()->numerify('########'),
+            'ticketNumber' =>
+                'TCK-' . fake()->unique()->numerify('########'),
             'userId' => $owner->id,
             'assignedUserId' => $agent?->id,
             'categoryId' => $this->category->id,
             'priorityId' => $this->priority->id,
             'statusId' => $status->id,
             'subject' => $subject,
-            'description' => 'Feature test ticket description.',
+            'description' =>
+                'Feature test ticket description.',
         ]);
     }
 
@@ -79,29 +81,38 @@ class TicketManagementTest extends TestCase
 
         Sanctum::actingAs($employee);
 
-        $response = $this->getJson('/api/tickets');
-
-        $response
+        $this->getJson('/api/tickets')
             ->assertOk()
             ->assertJsonCount(1, 'data.data')
-            ->assertJsonPath('data.data.0.id', $ownTicket->id);
+            ->assertJsonPath(
+                'data.data.0.id',
+                $ownTicket->id
+            );
     }
 
-    public function test_support_agent_only_lists_assigned_tickets(): void
+    public function test_support_agent_lists_all_tickets(): void
     {
         $employee = $this->user('User');
         $agent = $this->user('SupportAgent');
         $otherAgent = $this->user('SupportAgent');
 
-        $assignedTicket = $this->ticket($employee, 'Assigned', $agent);
-        $this->ticket($employee, 'Assigned', $otherAgent);
+        $this->ticket(
+            $employee,
+            'Assigned',
+            $agent
+        );
+
+        $this->ticket(
+            $employee,
+            'Assigned',
+            $otherAgent
+        );
 
         Sanctum::actingAs($agent);
 
         $this->getJson('/api/tickets')
             ->assertOk()
-            ->assertJsonCount(1, 'data.data')
-            ->assertJsonPath('data.data.0.id', $assignedTicket->id);
+            ->assertJsonCount(2, 'data.data');
     }
 
     public function test_manager_can_view_all_tickets_and_assign_an_agent(): void
@@ -119,12 +130,19 @@ class TicketManagementTest extends TestCase
             ->assertOk()
             ->assertJsonCount(2, 'data.data');
 
-        $this->patchJson("/api/tickets/{$ticket->id}/assign", [
-            'assignedUserId' => $agent->id,
-        ])
+        $this->patchJson(
+            "/api/tickets/{$ticket->id}/assign",
+            ['assignedUserId' => $agent->id]
+        )
             ->assertOk()
-            ->assertJsonPath('data.assignedUserId', $agent->id)
-            ->assertJsonPath('data.status.statusName', 'Assigned');
+            ->assertJsonPath(
+                'data.assignedUserId',
+                $agent->id
+            )
+            ->assertJsonPath(
+                'data.status.statusName',
+                'Assigned'
+            );
 
         $this->assertDatabaseHas('ticketassignments', [
             'ticketId' => $ticket->id,
@@ -141,9 +159,10 @@ class TicketManagementTest extends TestCase
 
         Sanctum::actingAs($employee);
 
-        $this->patchJson("/api/tickets/{$ticket->id}/assign", [
-            'assignedUserId' => $agent->id,
-        ])->assertForbidden();
+        $this->patchJson(
+            "/api/tickets/{$ticket->id}/assign",
+            ['assignedUserId' => $agent->id]
+        )->assertForbidden();
     }
 
     public function test_ticket_follows_assigned_in_progress_resolved_closed_workflow(): void
@@ -155,39 +174,73 @@ class TicketManagementTest extends TestCase
         $ticket = $this->ticket($employee);
 
         Sanctum::actingAs($manager);
-        $this->patchJson("/api/tickets/{$ticket->id}/assign", [
-            'assignedUserId' => $agent->id,
-        ])->assertOk();
+
+        $this->patchJson(
+            "/api/tickets/{$ticket->id}/assign",
+            ['assignedUserId' => $agent->id]
+        )->assertOk();
 
         Sanctum::actingAs($agent);
-        $this->patchJson("/api/tickets/{$ticket->id}/start")
-            ->assertOk()
-            ->assertJsonPath('data.status.statusName', 'InProgress');
 
-        $this->patchJson("/api/tickets/{$ticket->id}/resolve")
+        $this->patchJson(
+            "/api/tickets/{$ticket->id}/start"
+        )
             ->assertOk()
-            ->assertJsonPath('data.status.statusName', 'Resolved');
+            ->assertJsonPath(
+                'data.status.statusName',
+                'InProgress'
+            );
+
+        $this->patchJson(
+            "/api/tickets/{$ticket->id}/resolve",
+            [
+                'resolutionNote' =>
+                    'The issue was diagnosed and fixed.',
+            ]
+        )
+            ->assertOk()
+            ->assertJsonPath(
+                'data.status.statusName',
+                'Resolved'
+            )
+            ->assertJsonPath(
+                'data.resolutionNote',
+                'The issue was diagnosed and fixed.'
+            );
 
         Sanctum::actingAs($admin);
-        $this->patchJson("/api/tickets/{$ticket->id}/close")
+
+        $this->patchJson(
+            "/api/tickets/{$ticket->id}/close"
+        )
             ->assertOk()
-            ->assertJsonPath('data.status.statusName', 'Closed');
+            ->assertJsonPath(
+                'data.status.statusName',
+                'Closed'
+            );
     }
 
     public function test_employee_cannot_edit_a_ticket_after_assignment(): void
     {
         $employee = $this->user('User');
         $agent = $this->user('SupportAgent');
-        $ticket = $this->ticket($employee, 'Assigned', $agent);
+        $ticket = $this->ticket(
+            $employee,
+            'Assigned',
+            $agent
+        );
 
         Sanctum::actingAs($employee);
 
-        $this->putJson("/api/tickets/{$ticket->id}", [
-            'categoryId' => $this->category->id,
-            'priorityId' => $this->priority->id,
-            'subject' => 'Changed subject',
-            'description' => 'Changed description',
-        ])->assertForbidden();
+        $this->putJson(
+            "/api/tickets/{$ticket->id}",
+            [
+                'categoryId' => $this->category->id,
+                'priorityId' => $this->priority->id,
+                'subject' => 'Changed subject',
+                'description' => 'Changed description',
+            ]
+        )->assertForbidden();
     }
 
     public function test_only_manager_and_admin_can_view_ticket_report(): void
@@ -197,21 +250,33 @@ class TicketManagementTest extends TestCase
         $this->ticket($employee);
 
         Sanctum::actingAs($employee);
+
         $this->getJson('/api/manager/reports/tickets')
             ->assertForbidden();
 
         Sanctum::actingAs($manager);
+
         $this->getJson('/api/manager/reports/tickets')
             ->assertOk()
-            ->assertJsonPath('data.totals.tickets', 1)
-            ->assertJsonPath('data.totals.unassigned', 1);
+            ->assertJsonPath(
+                'data.totals.tickets',
+                1
+            )
+            ->assertJsonPath(
+                'data.totals.unassigned',
+                1
+            );
     }
 
     public function test_employee_cannot_see_internal_agent_comment(): void
     {
         $employee = $this->user('User');
         $agent = $this->user('SupportAgent');
-        $ticket = $this->ticket($employee, 'Assigned', $agent);
+        $ticket = $this->ticket(
+            $employee,
+            'Assigned',
+            $agent
+        );
 
         $ticket->comments()->create([
             'userId' => $agent->id,
@@ -227,10 +292,15 @@ class TicketManagementTest extends TestCase
 
         Sanctum::actingAs($employee);
 
-        $this->getJson("/api/tickets/{$ticket->id}/comments")
+        $this->getJson(
+            "/api/tickets/{$ticket->id}/comments"
+        )
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.comment', 'Visible update.');
+            ->assertJsonPath(
+                'data.0.comment',
+                'Visible update.'
+            );
     }
 
     public function test_ticket_owner_can_upload_and_delete_an_attachment(): void
@@ -244,23 +314,35 @@ class TicketManagementTest extends TestCase
 
         $response = $this->postJson(
             "/api/tickets/{$ticket->id}/attachments",
-            ['file' => UploadedFile::fake()->create('error.pdf', 100, 'application/pdf')]
+            [
+                'file' => UploadedFile::fake()->create(
+                    'error.pdf',
+                    100,
+                    'application/pdf'
+                ),
+            ]
         );
 
         $response
             ->assertCreated()
-            ->assertJsonPath('data.fileName', 'error.pdf');
+            ->assertJsonPath(
+                'data.fileName',
+                'error.pdf'
+            );
 
         $attachmentId = $response->json('data.id');
         $filePath = $response->json('data.filePath');
 
-        Storage::disk('public')->assertExists($filePath);
+        Storage::disk('public')
+            ->assertExists($filePath);
 
         $this->deleteJson(
-            "/api/tickets/{$ticket->id}/attachments/{$attachmentId}"
+            "/api/tickets/{$ticket->id}"
+            . "/attachments/{$attachmentId}"
         )->assertOk();
 
-        Storage::disk('public')->assertMissing($filePath);
+        Storage::disk('public')
+            ->assertMissing($filePath);
     }
 
     public function test_admin_can_change_another_users_role(): void
@@ -270,11 +352,15 @@ class TicketManagementTest extends TestCase
 
         Sanctum::actingAs($admin);
 
-        $this->patchJson("/api/admin/users/{$employee->id}/role", [
-            'roleName' => 'Manager',
-        ])
+        $this->patchJson(
+            "/api/admin/users/{$employee->id}/role",
+            ['roleName' => 'Manager']
+        )
             ->assertOk()
-            ->assertJsonPath('data.role.roleName', 'Manager');
+            ->assertJsonPath(
+                'data.role.roleName',
+                'Manager'
+            );
 
         $managerRoleId = Role::query()
             ->where('roleName', 'Manager')

@@ -7,73 +7,89 @@ import { useNavigate } from "react-router";
 
 import { getCategories } from "../api/lookupApi";
 import { getTickets } from "../api/ticketApi";
+import NotificationBell from "../components/Notifications/NotificationBell";
 import { useAuth } from "../context/AuthContext";
+import "../styles/tickets.css";
 
-function extractArray(response) {
-  if (Array.isArray(response)) {
-    return response;
-  }
-
-  if (Array.isArray(response?.data)) {
-    return response.data;
-  }
-
+function responseArray(response) {
   if (Array.isArray(response?.data?.data)) {
     return response.data.data;
   }
-
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response)) return response;
   return [];
+}
+
+function roleOf(user) {
+  return (
+    user?.role?.roleName ||
+    user?.roleName ||
+    user?.role ||
+    ""
+  );
+}
+
+function fullName(user, fallback = "Unassigned") {
+  if (!user) return fallback;
+
+  return (
+    user.fullName ||
+    `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+    user.email ||
+    fallback
+  );
+}
+
+function assignedUserOf(ticket) {
+  return ticket?.assignedUser || ticket?.assigned_user || null;
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+
+  return new Date(value).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function labelStatus(status) {
+  return status === "InProgress" ? "In Progress" : status;
 }
 
 function TicketsPage() {
   const navigate = useNavigate();
   const { token, user, logout } = useAuth();
+  const role = roleOf(user);
 
   const [tickets, setTickets] = useState([]);
   const [categories, setCategories] = useState([]);
-
   const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [priority, setPriority] = useState("");
-  const [category, setCategory] = useState("");
-  const [date, setDate] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [sortBy, setSortBy] = useState("createdAt");
-  const [sortDirection, setSortDirection] =
-    useState("desc");
-
+  const [filters, setFilters] = useState({
+    search: "",
+    status: "",
+    priority: "",
+    category: "",
+    date: "",
+    dateFrom: "",
+    dateTo: "",
+    sortBy: "createdAt",
+    sortDirection: "desc",
+  });
   const [pagination, setPagination] = useState({
     currentPage: 1,
     lastPage: 1,
     total: 0,
   });
-
   const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] =
-    useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const userRole =
-    user?.role?.roleName ||
-    user?.roleName ||
-    user?.role ||
-    "";
-
-  const canCreateTicket =
-    userRole === "Admin" || userRole === "User";
-
-  const loadCategories = useCallback(async () => {
-    try {
-      const response = await getCategories(token);
-      setCategories(extractArray(response));
-    } catch (error) {
-      console.error(
-        "Could not load categories:",
-        error
-      );
-    }
-  }, [token]);
+  const canCreate = role === "Admin" || role === "User";
+  const canOpenDashboard =
+    role === "Admin" || role === "Manager";
 
   const loadTickets = useCallback(
     async (page = 1) => {
@@ -82,92 +98,83 @@ function TicketsPage() {
         setErrorMessage("");
 
         const response = await getTickets(token, {
+          ...filters,
           page,
-          search,
-          status,
-          priority,
-          category,
-          date,
-          dateFrom,
-          dateTo,
-          sortBy,
-          sortDirection,
           perPage: 10,
         });
 
         const paginator = response?.data || {};
 
         setTickets(
-          Array.isArray(paginator?.data)
-            ? paginator.data
-            : []
+          Array.isArray(paginator.data) ? paginator.data : []
         );
-
         setPagination({
-          currentPage: paginator?.current_page || 1,
-          lastPage: paginator?.last_page || 1,
-          total: paginator?.total || 0,
+          currentPage: paginator.current_page || 1,
+          lastPage: paginator.last_page || 1,
+          total: paginator.total || 0,
         });
       } catch (error) {
         setTickets([]);
-
-        if (error.status === 401) {
-          setErrorMessage(
-            "Your session has expired. Please log in again."
-          );
-        } else if (error.status === 403) {
-          setErrorMessage(
-            error.message ||
-              "You do not have permission to view tickets."
-          );
-        } else {
-          setErrorMessage(
-            error.message ||
-              "Unable to load tickets."
-          );
-        }
+        setErrorMessage(
+          error?.message || "Unable to load tickets."
+        );
       } finally {
         setIsLoading(false);
       }
     },
-    [
-      token,
-      search,
-      status,
-      priority,
-      category,
-      date,
-      dateFrom,
-      dateTo,
-      sortBy,
-      sortDirection,
-    ]
+    [filters, token]
   );
-
-  useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
 
   useEffect(() => {
     loadTickets(1);
   }, [loadTickets]);
 
-  function handleSearch(event) {
+  useEffect(() => {
+    getCategories(token)
+      .then((response) =>
+        setCategories(responseArray(response))
+      )
+      .catch(() => setCategories([]));
+  }, [token]);
+
+  function submitSearch(event) {
     event.preventDefault();
-    setSearch(searchInput.trim());
+    setFilters((current) => ({
+      ...current,
+      search: searchInput.trim(),
+    }));
   }
 
-  function handleClearFilters() {
+  function setFilter(name, value) {
+    setFilters((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  }
+
+  function clearFilters() {
     setSearchInput("");
-    setSearch("");
-    setStatus("");
-    setPriority("");
-    setCategory("");
-    setDate("");
-    setDateFrom("");
-    setDateTo("");
-    setSortBy("createdAt");
-    setSortDirection("desc");
+    setFilters({
+      search: "",
+      status: "",
+      priority: "",
+      category: "",
+      date: "",
+      dateFrom: "",
+      dateTo: "",
+      sortBy: "createdAt",
+      sortDirection: "desc",
+    });
+  }
+
+  function isOverdue(ticket) {
+    return Boolean(
+      ticket.dueAt &&
+        !["Resolved", "Closed", "Cancelled"].includes(
+          ticket.status?.statusName
+        ) &&
+        new Date(ticket.dueAt).getTime() < Date.now()
+    );
   }
 
   async function handleLogout() {
@@ -175,92 +182,41 @@ function TicketsPage() {
     navigate("/login", { replace: true });
   }
 
-  function formatDate(dateValue) {
-    if (!dateValue) {
-      return "—";
-    }
-
-    return new Date(dateValue).toLocaleString(
-      "en-GB",
-      {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }
-    );
-  }
-
-  function isOverdue(ticket) {
-    if (!ticket?.dueAt) {
-      return false;
-    }
-
-    const statusName = ticket?.status?.statusName;
-
-    return (
-      !["Resolved", "Closed"].includes(statusName) &&
-      new Date(ticket.dueAt).getTime() < Date.now()
-    );
-  }
-
-  function getAssignedUserName(ticket) {
-    const assignedUser = ticket?.assignedUser;
-
-    if (!assignedUser) {
-      return "Unassigned";
-    }
-
-    return (
-      assignedUser.fullName ||
-      `${assignedUser.firstName || ""} ${
-        assignedUser.lastName || ""
-      }`.trim() ||
-      assignedUser.email ||
-      "Assigned"
-    );
-  }
-
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
+    <main className="tickets-page">
+      <header className="tickets-header">
         <div>
-          <h1 style={styles.title}>Tickets</h1>
-          <p style={styles.subtitle}>
-            View and manage help desk requests
+          <h1>Tickets</h1>
+          <p>
+            {role === "SupportAgent"
+              ? "Review all requests and work on tickets assigned to you."
+              : "View and manage help-desk requests."}
           </p>
         </div>
 
-        <div style={styles.headerActions}>
-          {(userRole === "Admin" ||
-            userRole === "Manager") && (
+        <div className="tickets-header-actions">
+          <NotificationBell />
+
+          {canOpenDashboard && (
             <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={() =>
-                navigate("/dashboard")
-              }
+              className="button button-secondary"
+              onClick={() => navigate("/dashboard")}
             >
               Dashboard
             </button>
           )}
 
-          {canCreateTicket && (
+          {canCreate && (
             <button
-              type="button"
-              style={styles.primaryButton}
-              onClick={() =>
-                navigate("/tickets/create")
-              }
+              className="button button-primary"
+              onClick={() => navigate("/tickets/create")}
             >
-              + Create Ticket
+              + Create ticket
             </button>
           )}
 
           <button
-            type="button"
-            style={styles.logoutButton}
+            className="button button-logout"
             onClick={handleLogout}
           >
             Log out
@@ -268,213 +224,153 @@ function TicketsPage() {
         </div>
       </header>
 
-      <section style={styles.userCard}>
+      <section className="tickets-user-bar">
         <div>
-          <strong>
-            {user?.fullName ||
-              `${user?.firstName || ""} ${
-                user?.lastName || ""
-              }`.trim() ||
-              "User"}
-          </strong>
-
-          <span style={styles.roleBadge}>
-            {userRole === "SupportAgent"
-              ? "Support Agent"
-              : userRole}
-          </span>
+          <strong>{fullName(user, "User")}</strong>
+          <span>{role === "SupportAgent" ? "Support Agent" : role}</span>
         </div>
-
-        <span style={styles.email}>
-          {user?.email}
-        </span>
+        <small>{user?.email}</small>
       </section>
 
-      <section style={styles.filtersCard}>
-        <form
-          style={styles.filters}
-          onSubmit={handleSearch}
+      <form
+        className="tickets-filters"
+        onSubmit={submitSearch}
+      >
+        <input
+          className="filter-search"
+          value={searchInput}
+          onChange={(event) =>
+            setSearchInput(event.target.value)
+          }
+          placeholder="Search ticket number, subject or description"
+        />
+
+        <select
+          value={filters.status}
+          onChange={(event) =>
+            setFilter("status", event.target.value)
+          }
         >
+          <option value="">All statuses</option>
+          <option value="Open">Open</option>
+          <option value="Assigned">Assigned</option>
+          <option value="InProgress">In Progress</option>
+          <option value="Escalated">Escalated</option>
+          <option value="Resolved">Resolved</option>
+          <option value="Closed">Closed</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+
+        <select
+          value={filters.priority}
+          onChange={(event) =>
+            setFilter("priority", event.target.value)
+          }
+        >
+          <option value="">All priorities</option>
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+          <option value="Urgent">Urgent</option>
+        </select>
+
+        <select
+          value={filters.category}
+          onChange={(event) =>
+            setFilter("category", event.target.value)
+          }
+        >
+          <option value="">All categories</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.categoryName}
+            </option>
+          ))}
+        </select>
+
+        <label>
+          <span>Exact date</span>
           <input
-            type="text"
-            value={searchInput}
-            onChange={(event) =>
-              setSearchInput(event.target.value)
-            }
-            placeholder="Search ticket number, subject or description"
-            style={styles.searchInput}
+            type="date"
+            value={filters.date}
+            onChange={(event) => {
+              setFilter("date", event.target.value);
+              if (event.target.value) {
+                setFilter("dateFrom", "");
+                setFilter("dateTo", "");
+              }
+            }}
           />
+        </label>
 
-          <select
-            value={status}
-            onChange={(event) =>
-              setStatus(event.target.value)
-            }
-            style={styles.select}
-          >
-            <option value="">All statuses</option>
-            <option value="Open">Open</option>
-            <option value="Assigned">
-              Assigned
-            </option>
-            <option value="InProgress">
-              In Progress
-            </option>
-            <option value="Resolved">
-              Resolved
-            </option>
-            <option value="Closed">Closed</option>
-          </select>
+        <label>
+          <span>From</span>
+          <input
+            type="date"
+            value={filters.dateFrom}
+            max={filters.dateTo || undefined}
+            onChange={(event) => {
+              setFilter("dateFrom", event.target.value);
+              if (event.target.value) {
+                setFilter("date", "");
+              }
+            }}
+          />
+        </label>
 
-          <select
-            value={priority}
-            onChange={(event) =>
-              setPriority(event.target.value)
-            }
-            style={styles.select}
-          >
-            <option value="">All priorities</option>
-            <option value="Low">Low</option>
-            <option value="Medium">Medium</option>
-            <option value="High">High</option>
-            <option value="Critical">
-              Critical
-            </option>
-          </select>
+        <label>
+          <span>To</span>
+          <input
+            type="date"
+            value={filters.dateTo}
+            min={filters.dateFrom || undefined}
+            onChange={(event) => {
+              setFilter("dateTo", event.target.value);
+              if (event.target.value) {
+                setFilter("date", "");
+              }
+            }}
+          />
+        </label>
 
-          <select
-            value={category}
-            onChange={(event) =>
-              setCategory(event.target.value)
-            }
-            style={styles.select}
-          >
-            <option value="">All categories</option>
+        <select
+          value={filters.sortBy}
+          onChange={(event) =>
+            setFilter("sortBy", event.target.value)
+          }
+        >
+          <option value="createdAt">Created date</option>
+          <option value="updatedAt">Updated date</option>
+          <option value="ticketNumber">Ticket number</option>
+          <option value="subject">Subject</option>
+        </select>
 
-            {categories.map((item) => (
-              <option
-                key={item.id}
-                value={item.id}
-              >
-                {item.categoryName}
-              </option>
-            ))}
-          </select>
+        <select
+          value={filters.sortDirection}
+          onChange={(event) =>
+            setFilter("sortDirection", event.target.value)
+          }
+        >
+          <option value="desc">Newest first</option>
+          <option value="asc">Oldest first</option>
+        </select>
 
-          <label style={styles.dateField}>
-            <span style={styles.dateLabel}>Exact date</span>
-            <input
-              type="date"
-              value={date}
-              onChange={(event) => {
-                setDate(event.target.value);
-                if (event.target.value) {
-                  setDateFrom("");
-                  setDateTo("");
-                }
-              }}
-              style={styles.dateInput}
-            />
-          </label>
-
-          <label style={styles.dateField}>
-            <span style={styles.dateLabel}>From</span>
-            <input
-              type="date"
-              value={dateFrom}
-              max={dateTo || undefined}
-              onChange={(event) => {
-                setDateFrom(event.target.value);
-                if (event.target.value) {
-                  setDate("");
-                }
-              }}
-              style={styles.dateInput}
-            />
-          </label>
-
-          <label style={styles.dateField}>
-            <span style={styles.dateLabel}>To</span>
-            <input
-              type="date"
-              value={dateTo}
-              min={dateFrom || undefined}
-              onChange={(event) => {
-                setDateTo(event.target.value);
-                if (event.target.value) {
-                  setDate("");
-                }
-              }}
-              style={styles.dateInput}
-            />
-          </label>
-
-          <select
-            value={sortBy}
-            onChange={(event) =>
-              setSortBy(event.target.value)
-            }
-            style={styles.select}
-          >
-            <option value="createdAt">
-              Sort by created date
-            </option>
-            <option value="updatedAt">
-              Sort by updated date
-            </option>
-            <option value="ticketNumber">
-              Sort by ticket number
-            </option>
-            <option value="subject">
-              Sort by subject
-            </option>
-          </select>
-
-          <select
-            value={sortDirection}
-            onChange={(event) =>
-              setSortDirection(
-                event.target.value
-              )
-            }
-            style={styles.select}
-          >
-            <option value="desc">
-              Newest first
-            </option>
-            <option value="asc">
-              Oldest first
-            </option>
-          </select>
-
-          <button
-            type="submit"
-            style={styles.primaryButton}
-          >
-            Search
-          </button>
-
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={handleClearFilters}
-          >
-            Clear
-          </button>
-        </form>
-      </section>
+        <button className="button button-primary">Search</button>
+        <button
+          type="button"
+          className="button button-secondary"
+          onClick={clearFilters}
+        >
+          Clear
+        </button>
+      </form>
 
       {errorMessage && (
-        <div style={styles.errorAlert}>
+        <div className="tickets-error">
           <span>{errorMessage}</span>
-
           <button
-            type="button"
-            style={styles.retryButton}
             onClick={() =>
-              loadTickets(
-                pagination.currentPage
-              )
+              loadTickets(pagination.currentPage)
             }
           >
             Try again
@@ -482,186 +378,112 @@ function TicketsPage() {
         </div>
       )}
 
-      <section style={styles.tableCard}>
-        <div style={styles.tableHeader}>
-          <h2 style={styles.sectionTitle}>
-            Ticket List
-          </h2>
-
-          <p style={styles.ticketCount}>
-            {pagination.total} ticket
-            {pagination.total === 1 ? "" : "s"}
-          </p>
+      <section className="tickets-table-card">
+        <div className="tickets-table-heading">
+          <div>
+            <h2>Ticket list</h2>
+            <span>
+              {pagination.total} ticket
+              {pagination.total === 1 ? "" : "s"}
+            </span>
+          </div>
         </div>
 
         {isLoading ? (
-          <div style={styles.emptyState}>
-            <p>Loading tickets...</p>
-          </div>
+          <div className="tickets-empty">Loading tickets…</div>
         ) : tickets.length === 0 ? (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>🎫</div>
-
-            <h3 style={styles.emptyTitle}>
-              No tickets found
-            </h3>
-
-            <p style={styles.emptyText}>
-              {search ||
-              status ||
-              priority ||
-              category ||
-              date ||
-              dateFrom ||
-              dateTo
-                ? "No tickets match the selected search or filters."
-                : "There are currently no tickets available."}
-            </p>
-
-            {canCreateTicket && (
-              <button
-                type="button"
-                style={styles.primaryButton}
-                onClick={() =>
-                  navigate("/tickets/create")
-                }
-              >
-                Create your first ticket
-              </button>
-            )}
+          <div className="tickets-empty">
+            <strong>No tickets found</strong>
+            <p>Try changing the selected filters.</p>
           </div>
         ) : (
           <>
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
+            <div className="tickets-table-scroll">
+              <table className="tickets-table">
                 <thead>
                   <tr>
-                    <th style={styles.th}>
-                      Ticket
-                    </th>
-                    <th style={styles.th}>
-                      Subject
-                    </th>
-                    <th style={styles.th}>
-                      Category
-                    </th>
-                    <th style={styles.th}>
-                      Priority
-                    </th>
-                    <th style={styles.th}>
-                      Status
-                    </th>
-                    <th style={styles.th}>
-                      Assigned To
-                    </th>
-                    <th style={styles.th}>
-                      Created
-                    </th>
-                    <th style={styles.th}>
-                      Assigned At
-                    </th>
-                    <th style={styles.th}>
-                      Due At
-                    </th>
-                    <th style={styles.th}>
-                      Action
-                    </th>
+                    <th>Ticket</th>
+                    <th>Subject</th>
+                    <th>Category</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Assigned to</th>
+                    {role === "SupportAgent" && <th>Your access</th>}
+                    <th>Created</th>
+                    <th>Assigned at</th>
+                    <th>Due at</th>
+                    <th />
                   </tr>
                 </thead>
-
                 <tbody>
                   {tickets.map((ticket) => {
-                    const statusName =
-                      ticket?.status
-                        ?.statusName ||
-                      "Unknown";
-
-                    const priorityName =
-                      ticket?.priority
-                        ?.priorityName ||
-                      "Unknown";
+                    const currentAgent =
+                      role === "SupportAgent" &&
+                      Number(ticket.assignedUserId) ===
+                        Number(user?.id);
 
                     return (
                       <tr key={ticket.id}>
-                        <td style={styles.td}>
-                          <strong>
-                            {
-                              ticket.ticketNumber
-                            }
-                          </strong>
+                        <td>
+                          <strong>{ticket.ticketNumber}</strong>
                         </td>
-
-                        <td style={styles.td}>
-                          {ticket.subject}
+                        <td>{ticket.subject}</td>
+                        <td>
+                          {ticket.category?.categoryName || "—"}
                         </td>
-
-                        <td style={styles.td}>
-                          {ticket?.category
-                            ?.categoryName || "—"}
-                        </td>
-
-                        <td style={styles.td}>
+                        <td>
                           <span
-                            style={styles.badge}
+                            className={`data-pill priority-${(
+                              ticket.priority?.priorityName || ""
+                            ).toLowerCase()}`}
                           >
-                            {priorityName}
+                            {ticket.priority?.priorityName || "—"}
                           </span>
                         </td>
-
-                        <td style={styles.td}>
+                        <td>
                           <span
-                            style={styles.badge}
+                            className={`data-pill status-${(
+                              ticket.status?.statusName || ""
+                            ).toLowerCase()}`}
                           >
-                            {formatStatus(
-                              statusName
+                            {labelStatus(
+                              ticket.status?.statusName
                             )}
                           </span>
                         </td>
-
-                        <td style={styles.td}>
-                          {getAssignedUserName(
-                            ticket
-                          )}
+                        <td>
+                          {fullName(assignedUserOf(ticket))}
                         </td>
-
-                        <td style={styles.td}>
-                          {formatDate(
-                            ticket.createdAt
-                          )}
-                        </td>
-
-                        <td style={styles.td}>
-                          {formatDate(
-                            ticket.assignedAt
-                          )}
-                        </td>
-
+                        {role === "SupportAgent" && (
+                          <td>
+                            <span
+                              className={`access-label ${
+                                currentAgent
+                                  ? "access-assigned"
+                                  : ""
+                              }`}
+                            >
+                              {currentAgent
+                                ? "Assigned to you"
+                                : "Read only"}
+                            </span>
+                          </td>
+                        )}
+                        <td>{formatDate(ticket.createdAt)}</td>
+                        <td>{formatDate(ticket.assignedAt)}</td>
                         <td
-                          style={{
-                            ...styles.td,
-                            ...(isOverdue(ticket)
-                              ? styles.overdue
-                              : {}),
-                          }}
+                          className={
+                            isOverdue(ticket) ? "is-overdue" : ""
+                          }
                         >
                           {formatDate(ticket.dueAt)}
-                          {isOverdue(ticket) && (
-                            <span style={styles.overdueBadge}>
-                              Overdue
-                            </span>
-                          )}
+                          {isOverdue(ticket) && <small>Overdue</small>}
                         </td>
-
-                        <td style={styles.td}>
+                        <td>
                           <button
-                            type="button"
-                            style={
-                              styles.viewButton
-                            }
+                            className="table-link"
                             onClick={() =>
-                              navigate(
-                                `/tickets/${ticket.id}`
-                              )
+                              navigate(`/tickets/${ticket.id}`)
                             }
                           >
                             View
@@ -674,38 +496,27 @@ function TicketsPage() {
               </table>
             </div>
 
-            <div style={styles.pagination}>
+            <div className="tickets-pagination">
               <button
-                type="button"
-                style={styles.secondaryButton}
-                disabled={
-                  pagination.currentPage <= 1
-                }
+                className="button button-secondary"
+                disabled={pagination.currentPage <= 1}
                 onClick={() =>
-                  loadTickets(
-                    pagination.currentPage - 1
-                  )
+                  loadTickets(pagination.currentPage - 1)
                 }
               >
                 Previous
               </button>
-
               <span>
                 Page {pagination.currentPage} of{" "}
                 {pagination.lastPage}
               </span>
-
               <button
-                type="button"
-                style={styles.secondaryButton}
+                className="button button-secondary"
                 disabled={
-                  pagination.currentPage >=
-                  pagination.lastPage
+                  pagination.currentPage >= pagination.lastPage
                 }
                 onClick={() =>
-                  loadTickets(
-                    pagination.currentPage + 1
-                  )
+                  loadTickets(pagination.currentPage + 1)
                 }
               >
                 Next
@@ -714,281 +525,8 @@ function TicketsPage() {
           </>
         )}
       </section>
-    </div>
+    </main>
   );
 }
-
-function formatStatus(status) {
-  return status === "InProgress"
-    ? "In Progress"
-    : status;
-}
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    padding: "32px",
-    backgroundColor: "#f4f7fb",
-    fontFamily: "Arial, sans-serif",
-  },
-
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "20px",
-    marginBottom: "24px",
-    flexWrap: "wrap",
-  },
-
-  title: {
-    margin: 0,
-    fontSize: "32px",
-    color: "#172033",
-  },
-
-  subtitle: {
-    margin: "6px 0 0",
-    color: "#667085",
-  },
-
-  headerActions: {
-    display: "flex",
-    gap: "10px",
-    flexWrap: "wrap",
-  },
-
-  primaryButton: {
-    padding: "11px 18px",
-    border: "none",
-    borderRadius: "8px",
-    backgroundColor: "#2563eb",
-    color: "#ffffff",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-
-  secondaryButton: {
-    padding: "10px 16px",
-    border: "1px solid #d0d5dd",
-    borderRadius: "8px",
-    backgroundColor: "#ffffff",
-    color: "#344054",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-
-  logoutButton: {
-    padding: "10px 16px",
-    border: "1px solid #fecaca",
-    borderRadius: "8px",
-    backgroundColor: "#ffffff",
-    color: "#b42318",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-
-  userCard: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "16px 20px",
-    marginBottom: "20px",
-    border: "1px solid #e4e7ec",
-    borderRadius: "12px",
-    backgroundColor: "#ffffff",
-    flexWrap: "wrap",
-    gap: "10px",
-  },
-
-  roleBadge: {
-    display: "inline-block",
-    marginLeft: "10px",
-    padding: "4px 9px",
-    borderRadius: "20px",
-    backgroundColor: "#eef4ff",
-    color: "#3538cd",
-    fontSize: "12px",
-    fontWeight: 600,
-  },
-
-  email: {
-    color: "#667085",
-  },
-
-  filtersCard: {
-    padding: "18px",
-    marginBottom: "20px",
-    border: "1px solid #e4e7ec",
-    borderRadius: "12px",
-    backgroundColor: "#ffffff",
-  },
-
-  filters: {
-    display: "flex",
-    gap: "12px",
-    flexWrap: "wrap",
-  },
-  overdue: {
-    color: "#b42318",
-    fontWeight: 700,
-  },
-  overdueBadge: {
-    display: "block",
-    width: "fit-content",
-    marginTop: "4px",
-    padding: "2px 7px",
-    borderRadius: "999px",
-    backgroundColor: "#fee4e2",
-    color: "#b42318",
-    fontSize: "11px",
-  },
-  dateField: {
-    display: "grid",
-    gap: "4px",
-    minWidth: "145px",
-  },
-  dateLabel: {
-    color: "#667085",
-    fontSize: "12px",
-    fontWeight: 700,
-  },
-  dateInput: {
-    minHeight: "42px",
-    padding: "8px 10px",
-    border: "1px solid #d0d5dd",
-    borderRadius: "8px",
-    backgroundColor: "#ffffff",
-    color: "#344054",
-  },
-
-  searchInput: {
-    flex: "1 1 300px",
-    minWidth: "240px",
-    padding: "11px 12px",
-    border: "1px solid #d0d5dd",
-    borderRadius: "8px",
-  },
-
-  select: {
-    minWidth: "155px",
-    padding: "11px 12px",
-    border: "1px solid #d0d5dd",
-    borderRadius: "8px",
-    backgroundColor: "#ffffff",
-  },
-
-  errorAlert: {
-    display: "flex",
-    justifyContent: "space-between",
-    padding: "14px 18px",
-    marginBottom: "20px",
-    border: "1px solid #fecaca",
-    borderRadius: "10px",
-    backgroundColor: "#fef2f2",
-    color: "#b42318",
-  },
-
-  retryButton: {
-    border: "none",
-    backgroundColor: "transparent",
-    color: "#b42318",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-
-  tableCard: {
-    overflow: "hidden",
-    border: "1px solid #e4e7ec",
-    borderRadius: "12px",
-    backgroundColor: "#ffffff",
-  },
-
-  tableHeader: {
-    padding: "20px",
-    borderBottom: "1px solid #e4e7ec",
-  },
-
-  sectionTitle: {
-    margin: 0,
-    color: "#172033",
-  },
-
-  ticketCount: {
-    margin: "5px 0 0",
-    color: "#667085",
-  },
-
-  tableWrapper: {
-    overflowX: "auto",
-  },
-
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-  },
-
-  th: {
-    padding: "14px 16px",
-    borderBottom: "1px solid #e4e7ec",
-    backgroundColor: "#f9fafb",
-    color: "#475467",
-    fontSize: "12px",
-    textAlign: "left",
-  },
-
-  td: {
-    padding: "16px",
-    borderBottom: "1px solid #eaecf0",
-    color: "#344054",
-    whiteSpace: "nowrap",
-  },
-
-  badge: {
-    display: "inline-block",
-    padding: "5px 9px",
-    borderRadius: "20px",
-    backgroundColor: "#eef2ff",
-    color: "#3730a3",
-    fontSize: "12px",
-    fontWeight: 700,
-  },
-
-  viewButton: {
-    border: "none",
-    backgroundColor: "transparent",
-    color: "#2563eb",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-
-  emptyState: {
-    padding: "70px 20px",
-    textAlign: "center",
-    color: "#667085",
-  },
-
-  emptyIcon: {
-    marginBottom: "12px",
-    fontSize: "46px",
-  },
-
-  emptyTitle: {
-    margin: "0 0 8px",
-    color: "#172033",
-  },
-
-  emptyText: {
-    margin: "0 0 20px",
-  },
-
-  pagination: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: "18px",
-    padding: "18px",
-  },
-};
 
 export default TicketsPage;

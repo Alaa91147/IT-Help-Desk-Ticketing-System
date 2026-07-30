@@ -15,6 +15,7 @@ class Notification extends Model
     protected $fillable = [
         'userId',
         'ticketId',
+        'type',
         'title',
         'message',
         'isRead',
