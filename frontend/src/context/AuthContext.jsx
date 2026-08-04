@@ -34,7 +34,10 @@ export function AuthProvider({ children }) {
       try {
         const response = await getCurrentUser(storedToken);
 
-        const currentUser = response.data?.user ?? response.user ?? response.data;
+        const currentUser =
+          response.data?.user ??
+          response.user ??
+          response.data;
 
         setUser(currentUser);
         setToken(storedToken);
@@ -65,20 +68,24 @@ export function AuthProvider({ children }) {
     setToken(authenticationToken);
   };
 
-  const logout = async () => {
-  const storedToken = getAuthToken();
+  const updateUser = (updatedUser) => {
+    setUser(updatedUser);
+  };
 
-  try {
-    if (storedToken) {
-      await logoutUser(storedToken);
+  const logout = async () => {
+    const storedToken = getAuthToken();
+
+    try {
+      if (storedToken) {
+        await logoutUser(storedToken);
+      }
+    } catch (error) {
+      console.error("Logout request failed:", error);
+    } finally {
+      clearAuthData();
+      setUser(null);
+      setToken(null);
     }
-  } catch (error) {
-    console.error("Logout request failed:", error);
-  } finally {
-    clearAuthData();
-    setUser(null);
-    setToken(null);
-  }
   };
 
   const value = useMemo(
@@ -89,6 +96,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(token && user),
       login,
       logout,
+      updateUser,
     }),
     [user, token, isLoading]
   );
