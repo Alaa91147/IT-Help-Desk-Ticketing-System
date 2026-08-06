@@ -29,12 +29,18 @@ class TicketComment extends Model
 
     public function ticket(): BelongsTo
     {
-        return $this->belongsTo(Ticket::class, 'ticketId');
+        return $this->belongsTo(
+            Ticket::class,
+            'ticketId'
+        );
     }
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'userId');
+        return $this->belongsTo(
+            User::class,
+            'userId'
+        );
     }
 
     public function parent(): BelongsTo
@@ -50,6 +56,14 @@ class TicketComment extends Model
         return $this->hasMany(
             TicketComment::class,
             'parentCommentId'
+        )->orderBy('createdAt');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(
+            TicketAttachment::class,
+            'commentId'
         )->orderBy('createdAt');
     }
 }

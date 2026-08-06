@@ -218,16 +218,28 @@ export function getTicketAttachments(ticketId, token) {
 export function uploadTicketAttachment(
   ticketId,
   file,
-  token
+  token,
+  commentId = null
 ) {
   const formData = new FormData();
+
   formData.append("file", file);
 
-  return apiRequest(`/tickets/${ticketId}/attachments`, {
-    method: "POST",
-    token,
-    body: formData,
-  });
+  if (commentId) {
+    formData.append(
+      "commentId",
+      String(commentId)
+    );
+  }
+
+  return apiRequest(
+    `/tickets/${ticketId}/attachments`,
+    {
+      method: "POST",
+      token,
+      body: formData,
+    }
+  );
 }
 
 export function downloadTicketAttachment(

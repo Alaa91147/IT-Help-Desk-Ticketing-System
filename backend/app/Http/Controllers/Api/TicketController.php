@@ -8,6 +8,7 @@ use App\Models\Ticket;
 use App\Models\TicketAssignment;
 use App\Models\User;
 use App\Models\Priority;
+use App\Models\ActivityLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -340,7 +341,11 @@ class TicketController extends Controller
             $user,
             $request->ip()
         );
-
+$this->notificationService
+    ->ticketCreatedForManagement(
+        $ticket,
+        $user
+    );
         return response()->json([
             'success' => true,
             'message' => 'Ticket created successfully.',
@@ -1178,8 +1183,17 @@ class TicketController extends Controller
                     $user,
                     $validated['reason']
                 );
+                
             }
+               $this->notificationService
+    ->ticketCancelledForManagement(
+        $ticket,
+        $user,
+        $validated['reason']
+    );
         });
+     
+
 
         return response()->json([
             'success' => true,
@@ -1286,6 +1300,11 @@ class TicketController extends Controller
                     $user,
                     'Closed'
                 );
+                $this->notificationService
+    ->ticketClosedForManagement(
+        $ticket,
+        $user
+    );
         });
 
         $ticket->refresh();
@@ -1325,7 +1344,7 @@ class TicketController extends Controller
             ],
         ]);
     }
-       public function ticketSummary(
+    public function ticketSummary(
         Request $request
     ): JsonResponse {
         /** @var User $user */
@@ -1333,11 +1352,12 @@ class TicketController extends Controller
 
         if (!in_array(
             $user->role?->roleName,
-            [self::MANAGER, self::ADMIN],
+            [self::MANAGER, self::ADMIN, self::AGENT],
             true
         )) {
             return $this->forbidden(
-                'Only Managers and Admins can view reports.'
+                'Only Managers, Admins, and Support Agents '
+                . 'can view reports.'
             );
         }
 
@@ -1358,7 +1378,10 @@ class TicketController extends Controller
         }
 
         $baseQuery = $this->withinDateRange(
-            Ticket::query(),
+            $this->scopeReportTickets(
+                Ticket::query(),
+                $user
+            ),
             $filters
         );
 
@@ -1437,11 +1460,34 @@ class TicketController extends Controller
             ->orderByDesc('total')
             ->get();
 
-        $completedResolutionDurations = $reportTickets
-            ->filter(
-                fn (Ticket $ticket): bool =>
-                    $ticket->resolvedAt !== null
-            )
+        $resolvedTickets = $this->withinEventDateRange(
+            $this->scopeReportTickets(
+                Ticket::query(),
+                $user
+            ),
+            $filters,
+            'resolvedAt'
+        )->get(['createdAt', 'resolvedAt']);
+
+        $cancelledCount = $this->withinEventDateRange(
+            $this->scopeReportTickets(
+                Ticket::query(),
+                $user
+            ),
+            $filters,
+            'cancelledAt'
+        )->count();
+
+        $closedTickets = $this->withinEventDateRange(
+            $this->scopeReportTickets(
+                Ticket::query(),
+                $user
+            ),
+            $filters,
+            'closedAt'
+        )->get(['createdAt', 'closedAt']);
+
+        $completedResolutionDurations = $resolvedTickets
             ->map(
                 fn (Ticket $ticket): int =>
                     (int) $ticket->createdAt->diffInSeconds(
@@ -1450,11 +1496,7 @@ class TicketController extends Controller
                     )
             );
 
-        $completedClosureDurations = $reportTickets
-            ->filter(
-                fn (Ticket $ticket): bool =>
-                    $ticket->closedAt !== null
-            )
+        $completedClosureDurations = $closedTickets
             ->map(
                 fn (Ticket $ticket): int =>
                     (int) $ticket->createdAt->diffInSeconds(
@@ -1483,6 +1525,11 @@ class TicketController extends Controller
 
         $agentPerformance = User::query()
             ->where('isActive', true)
+            ->when(
+                $user->role?->roleName === self::AGENT,
+                fn (Builder $query) =>
+                    $query->whereKey($user->id)
+            )
             ->whereHas(
                 'role',
                 function (Builder $query): void {
@@ -1586,6 +1633,95 @@ class TicketController extends Controller
                 'email',
             ]);
 
+        $monthlyTrend = collect([1, 0])->map(
+            function (int $monthsAgo) use ($user): array {
+                $start = now()
+                    ->startOfMonth()
+                    ->subMonths($monthsAgo);
+                $end = $start->copy()->endOfMonth();
+
+                $created = $this->scopeReportTickets(
+                    Ticket::query(),
+                    $user
+                )
+                    ->whereBetween('createdAt', [$start, $end])
+                    ->count();
+
+                $resolvedTickets = $this->scopeReportTickets(
+                    Ticket::query(),
+                    $user
+                )
+                    ->whereBetween('resolvedAt', [$start, $end])
+                    ->get(['createdAt', 'resolvedAt']);
+
+                $cancelled = $this->scopeReportTickets(
+                    Ticket::query(),
+                    $user
+                )
+                    ->whereBetween('cancelledAt', [$start, $end])
+                    ->count();
+
+                $closed = $this->scopeReportTickets(
+                    Ticket::query(),
+                    $user
+                )
+                    ->whereBetween('closedAt', [$start, $end])
+                    ->count();
+
+                $averageResolutionSeconds = $resolvedTickets
+                    ->map(
+                        fn (Ticket $ticket): int =>
+                            (int) $ticket->createdAt
+                                ->diffInSeconds(
+                                    $ticket->resolvedAt,
+                                    true
+                                )
+                    )
+                    ->average();
+
+                return [
+                    'month' => $start->format('Y-m'),
+                    'label' => $start->format('M Y'),
+                    'created' => $created,
+                    'resolved' => $resolvedTickets->count(),
+                    'cancelled' => $cancelled,
+                    'closed' => $closed,
+                    'averageResolutionSeconds' =>
+                        $averageResolutionSeconds === null
+                            ? 0
+                            : (int) round(
+                                $averageResolutionSeconds
+                            ),
+                ];
+            }
+        );
+
+        $latestUpdates = ActivityLog::query()
+            ->with([
+                'user.role',
+                'ticket.status',
+            ])
+            ->where(
+                'createdAt',
+                '>=',
+                now()->subMonths(2)->startOfDay()
+            )
+            ->when(
+                $user->role?->roleName === self::AGENT,
+                fn (Builder $query) =>
+                    $query->whereHas(
+                        'ticket',
+                        fn (Builder $ticketQuery) =>
+                            $this->scopeReportTickets(
+                                $ticketQuery,
+                                $user
+                            )
+                    )
+            )
+            ->orderByDesc('createdAt')
+            ->limit(20)
+            ->get();
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -1613,29 +1749,11 @@ class TicketController extends Controller
                         )
                         ->count(),
 
-                    'cancelled' => $reportTickets
-                        ->filter(
-                            fn (Ticket $ticket): bool =>
-                                $ticket->status?->statusName
-                                    === 'Cancelled'
-                        )
-                        ->count(),
+                    'cancelled' => $cancelledCount,
 
-                    'resolved' => $reportTickets
-                        ->filter(
-                            fn (Ticket $ticket): bool =>
-                                $ticket->status?->statusName
-                                    === 'Resolved'
-                        )
-                        ->count(),
+                    'resolved' => $resolvedTickets->count(),
 
-                    'closed' => $reportTickets
-                        ->filter(
-                            fn (Ticket $ticket): bool =>
-                                $ticket->status?->statusName
-                                    === 'Closed'
-                        )
-                        ->count(),
+                    'closed' => $closedTickets->count(),
 
                     'assignments' => (int) $reportTickets
                         ->sum('assignmentCount'),
@@ -1669,6 +1787,11 @@ class TicketController extends Controller
                 'byPriority' => $byPriority,
                 'byCategory' => $byCategory,
                 'agentPerformance' => $agentPerformance,
+                'monthlyTrend' => $monthlyTrend,
+                'latestUpdates' => $latestUpdates,
+                'scope' => $user->role?->roleName === self::AGENT
+                    ? 'personal'
+                    : 'management',
             ],
         ]);
     }
@@ -1804,28 +1927,84 @@ class TicketController extends Controller
         ]);
     }
 
-private function withinDateRange(
-    Builder $query,
-    array $filters
-): Builder {
-    return $query
-        ->when(
-            $filters['dateFrom'] ?? null,
-            fn (Builder $builder, string $date) =>
-                $builder->whereDate(
-                    'tickets.createdAt',
-                    '>=',
-                    $date
-                )
-        )
-        ->when(
-            $filters['dateTo'] ?? null,
-            fn (Builder $builder, string $date) =>
-                $builder->whereDate(
-                    'tickets.createdAt',
-                    '<=',
-                    $date
-                )
+    private function scopeReportTickets(
+        Builder $query,
+        User $user
+    ): Builder {
+        if ($user->role?->roleName !== self::AGENT) {
+            return $query;
+        }
+
+        return $query->where(
+            function (Builder $scope) use ($user): void {
+                $scope
+                    ->where(
+                        'tickets.assignedUserId',
+                        $user->id
+                    )
+                    ->orWhereHas(
+                        'workSessions',
+                        fn (Builder $sessions) =>
+                            $sessions->where(
+                                'userId',
+                                $user->id
+                            )
+                    );
+            }
         );
-}
+    }
+
+    private function withinEventDateRange(
+        Builder $query,
+        array $filters,
+        string $column
+    ): Builder {
+        $qualifiedColumn = "tickets.{$column}";
+
+        return $query
+            ->whereNotNull($qualifiedColumn)
+            ->when(
+                $filters['dateFrom'] ?? null,
+                fn (Builder $builder, string $date) =>
+                    $builder->whereDate(
+                        $qualifiedColumn,
+                        '>=',
+                        $date
+                    )
+            )
+            ->when(
+                $filters['dateTo'] ?? null,
+                fn (Builder $builder, string $date) =>
+                    $builder->whereDate(
+                        $qualifiedColumn,
+                        '<=',
+                        $date
+                    )
+            );
+    }
+
+    private function withinDateRange(
+        Builder $query,
+        array $filters
+    ): Builder {
+        return $query
+            ->when(
+                $filters['dateFrom'] ?? null,
+                fn (Builder $builder, string $date) =>
+                    $builder->whereDate(
+                        'tickets.createdAt',
+                        '>=',
+                        $date
+                    )
+            )
+            ->when(
+                $filters['dateTo'] ?? null,
+                fn (Builder $builder, string $date) =>
+                    $builder->whereDate(
+                        'tickets.createdAt',
+                        '<=',
+                        $date
+                    )
+            );
+    }
 }
