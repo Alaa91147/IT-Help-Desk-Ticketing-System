@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\NotificationCreated;
 use App\Models\Notification;
 use App\Models\Ticket;
 use App\Models\User;
@@ -16,7 +17,7 @@ class TicketNotificationService
         string $title,
         string $message
     ): Notification {
-        return Notification::query()->create([
+        $notification = Notification::query()->create([
             'userId' => $recipient->id,
             'ticketId' => $ticket?->id,
             'type' => $type,
@@ -25,6 +26,10 @@ class TicketNotificationService
             'isRead' => false,
             'readAt' => null,
         ]);
+
+        NotificationCreated::dispatch($notification);
+
+        return $notification;
     }
 
     public function assigned(
@@ -134,7 +139,8 @@ class TicketNotificationService
             'ticket_cancelled',
             'Ticket cancelled',
             "{$ticket->ticketNumber} was cancelled by "
-                . "{$cancelledBy->firstName} {$cancelledBy->lastName}. "
+                . "{$cancelledBy->firstName} "
+                . "{$cancelledBy->lastName}. "
                 . "Reason: {$reason}"
         );
     }
@@ -169,4 +175,99 @@ class TicketNotificationService
                 )
         );
     }
+    private function managementRecipients(
+    ?User $excludedUser = null
+): Collection {
+    return User::query()
+        ->where('isActive', true)
+        ->whereHas('role', function ($query): void {
+            $query->whereIn('roleName', [
+                'Admin',
+                'Manager',
+            ]);
+        })
+        ->when(
+            $excludedUser,
+            fn ($query) =>
+                $query->where(
+                    'id',
+                    '!=',
+                    $excludedUser->id
+                )
+        )
+        ->get();
+}
+
+public function ticketCreatedForManagement(
+    Ticket $ticket,
+    User $createdBy
+): Collection {
+    $createdAt = $ticket->createdAt
+        ?->format('d/m/Y H:i:s');
+
+    return $this->managementRecipients($createdBy)
+        ->map(
+            fn (User $recipient): Notification =>
+                $this->send(
+                    $recipient,
+                    $ticket,
+                    'ticket_created',
+                    'New ticket created',
+                    "{$ticket->ticketNumber}: "
+                        . "{$ticket->subject} was created by "
+                        . "{$createdBy->firstName} "
+                        . "{$createdBy->lastName} at "
+                        . "{$createdAt}."
+                )
+        );
+}
+
+public function ticketClosedForManagement(
+    Ticket $ticket,
+    User $closedBy
+): Collection {
+    $closedAt = $ticket->closedAt
+        ?->format('d/m/Y H:i:s');
+
+    return $this->managementRecipients($closedBy)
+        ->map(
+            fn (User $recipient): Notification =>
+                $this->send(
+                    $recipient,
+                    $ticket,
+                    'ticket_closed',
+                    'Ticket closed',
+                    "{$ticket->ticketNumber}: "
+                        . "{$ticket->subject} was closed by "
+                        . "{$closedBy->firstName} "
+                        . "{$closedBy->lastName} at "
+                        . "{$closedAt}."
+                )
+        );
+}
+
+public function ticketCancelledForManagement(
+    Ticket $ticket,
+    User $cancelledBy,
+    string $reason
+): Collection {
+    $cancelledAt = $ticket->cancelledAt
+        ?->format('d/m/Y H:i:s');
+
+    return $this->managementRecipients($cancelledBy)
+        ->map(
+            fn (User $recipient): Notification =>
+                $this->send(
+                    $recipient,
+                    $ticket,
+                    'ticket_cancelled_management',
+                    'Ticket cancelled',
+                    "{$ticket->ticketNumber}: "
+                        . "{$ticket->subject} was cancelled by "
+                        . "{$cancelledBy->firstName} "
+                        . "{$cancelledBy->lastName} at "
+                        . "{$cancelledAt}. Reason: {$reason}"
+                )
+        );
+}
 }

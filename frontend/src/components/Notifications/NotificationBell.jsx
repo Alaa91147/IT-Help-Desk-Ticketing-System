@@ -14,6 +14,7 @@ import {
 } from "../../api/notificationApi";
 import { useAuth } from "../../context/AuthContext";
 import "../../styles/notifications.css";
+import { createEcho } from "../../realtime/echo";
 
 function notificationArray(response) {
   if (Array.isArray(response?.data?.data)) {
@@ -25,7 +26,7 @@ function notificationArray(response) {
 
 function NotificationBell() {
   const navigate = useNavigate();
-  const { token } = useAuth();
+const { token, user } = useAuth();
   const wrapperRef = useRef(null);
 
   const [notifications, setNotifications] = useState([]);
@@ -56,6 +57,41 @@ function NotificationBell() {
     }
   }, [token]);
 
+  useEffect(() => {
+  if (!token || !user?.id) return undefined;
+
+  const echo = createEcho(token);
+  const channelName = `App.Models.User.${user.id}`;
+
+  const channel = echo.private(channelName);
+
+  channel.listen(
+    ".notification.created",
+    (event) => {
+      const incomingNotification =
+        event?.notification;
+
+      if (!incomingNotification) return;
+
+      setNotifications((current) => [
+        incomingNotification,
+        ...current.filter(
+          (item) =>
+            item.id !== incomingNotification.id
+        ),
+      ].slice(0, 12));
+
+      if (!incomingNotification.isRead) {
+        setUnreadCount((current) => current + 1);
+      }
+    }
+  );
+
+  return () => {
+    echo.leave(channelName);
+    echo.disconnect();
+  };
+}, [token, user?.id]);
   useEffect(() => {
     loadNotifications();
 
@@ -183,7 +219,7 @@ function NotificationBell() {
           if (!isOpen) loadNotifications();
         }}
       >
-        <span aria-hidden="true">🔔</span>
+<span aria-hidden="true">{"\u{1F514}"}</span>
         {unreadCount > 0 && (
           <span className="notification-count">
             {unreadCount > 99 ? "99+" : unreadCount}

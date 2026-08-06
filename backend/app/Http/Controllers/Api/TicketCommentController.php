@@ -10,6 +10,7 @@ use App\Services\TicketActivityService;
 use App\Services\TicketNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class TicketCommentController extends Controller
 {
@@ -21,31 +22,20 @@ class TicketCommentController extends Controller
 
     private function roleName(User $user): ?string
     {
-        return $user->loadMissing('role')->role?->roleName;
+        return $user
+            ->loadMissing('role')
+            ->role?->roleName;
     }
 
-    private function isHistoricalAgent(
+    private function canView(
         User $user,
         Ticket $ticket
     ): bool {
-        if ($this->roleName($user) !== 'SupportAgent') {
-            return false;
-        }
-
-        return $ticket->assignments()
-            ->where('assignedUserId', $user->id)
-            ->exists()
-            || $ticket->workSessions()
-                ->where('userId', $user->id)
-                ->exists();
-    }
-
-    private function canView(User $user, Ticket $ticket): bool
-    {
         return match ($this->roleName($user)) {
-            'Admin', 'Manager' => true,
-            'SupportAgent' => true,
-            'User' => (int) $ticket->userId === (int) $user->id,
+            'Admin', 'Manager', 'SupportAgent' => true,
+            'User' =>
+                (int) $ticket->userId
+                === (int) $user->id,
             default => false,
         };
     }
@@ -57,21 +47,23 @@ class TicketCommentController extends Controller
         return match ($this->roleName($user)) {
             'Admin', 'Manager' => true,
             'SupportAgent' =>
-                (int) $ticket->assignedUserId === (int) $user->id,
-            'User' => (int) $ticket->userId === (int) $user->id,
+                (int) $ticket->assignedUserId
+                === (int) $user->id,
+            'User' =>
+                (int) $ticket->userId
+                === (int) $user->id,
             default => false,
         };
     }
 
     private function canViewInternalNotes(
-        User $user,
-        Ticket $ticket
+        User $user
     ): bool {
-        return match ($this->roleName($user)) {
-            'Admin', 'Manager' => true,
-            'SupportAgent' => true,
-            default => false,
-        };
+        return in_array(
+            $this->roleName($user),
+            ['Admin', 'Manager', 'SupportAgent'],
+            true
+        );
     }
 
     private function canCreateInternalNotes(
@@ -81,13 +73,15 @@ class TicketCommentController extends Controller
         return match ($this->roleName($user)) {
             'Admin', 'Manager' => true,
             'SupportAgent' =>
-                (int) $ticket->assignedUserId === (int) $user->id,
+                (int) $ticket->assignedUserId
+                === (int) $user->id,
             default => false,
         };
     }
 
-    private function forbidden(string $message): JsonResponse
-    {
+    private function forbidden(
+        string $message
+    ): JsonResponse {
         return response()->json([
             'success' => false,
             'message' => $message,
@@ -128,15 +122,14 @@ class TicketCommentController extends Controller
             );
         }
 
-        $canViewInternal = $this->canViewInternalNotes(
-            $user,
-            $ticket
-        );
+        $canViewInternal =
+            $this->canViewInternalNotes($user);
 
         $comments = $ticket->comments()
             ->whereNull('parentCommentId')
             ->with([
                 'user.role',
+                'attachments.uploadedBy.role',
                 'replies' => function ($query) use (
                     $canViewInternal
                 ): void {
@@ -149,14 +142,20 @@ class TicketCommentController extends Controller
                                     false
                                 )
                         )
-                        ->with('user.role')
+                        ->with([
+                            'user.role',
+                            'attachments.uploadedBy.role',
+                        ])
                         ->orderBy('createdAt');
                 },
             ])
             ->when(
                 !$canViewInternal,
                 fn ($query) =>
-                    $query->where('isInternal', false)
+                    $query->where(
+                        'isInternal',
+                        false
+                    )
             )
             ->orderBy('createdAt')
             ->get();
@@ -205,7 +204,9 @@ class TicketCommentController extends Controller
 
         if (!empty($validated['parentCommentId'])) {
             $parent = TicketComment::query()
-                ->findOrFail($validated['parentCommentId']);
+                ->findOrFail(
+                    $validated['parentCommentId']
+                );
 
             if (
                 (int) $parent->ticketId
@@ -219,9 +220,7 @@ class TicketCommentController extends Controller
                 ], 422);
             }
 
-            if (
-                $parent->parentCommentId !== null
-            ) {
+            if ($parent->parentCommentId !== null) {
                 return response()->json([
                     'success' => false,
                     'message' =>
@@ -232,7 +231,7 @@ class TicketCommentController extends Controller
 
             if (
                 $parent->isInternal
-                && !$this->canViewInternalNotes($user, $ticket)
+                && !$this->canViewInternalNotes($user)
             ) {
                 return $this->forbidden(
                     'You cannot reply to an internal note.'
@@ -246,7 +245,10 @@ class TicketCommentController extends Controller
 
         $isInternal = $parent?->isInternal
             ?? (
-                $this->canCreateInternalNotes($user, $ticket)
+                $this->canCreateInternalNotes(
+                    $user,
+                    $ticket
+                )
                     ? $requestedInternal
                     : false
             );
@@ -278,7 +280,8 @@ class TicketCommentController extends Controller
             null,
             [
                 'commentId' => $comment->id,
-                'parentCommentId' => $comment->parentCommentId,
+                'parentCommentId' =>
+                    $comment->parentCommentId,
                 'isInternal' => $comment->isInternal,
             ],
             $request->ip()
@@ -292,7 +295,8 @@ class TicketCommentController extends Controller
             ->unique()
             ->reject(
                 fn (int $recipientId): bool =>
-                    (int) $recipientId === (int) $user->id
+                    (int) $recipientId
+                    === (int) $user->id
             );
 
         $recipients = User::query()
@@ -316,6 +320,7 @@ class TicketCommentController extends Controller
             'data' => $comment->load([
                 'user.role',
                 'parent.user.role',
+                'attachments.uploadedBy.role',
             ]),
         ], 201);
     }
@@ -334,12 +339,17 @@ class TicketCommentController extends Controller
 
         /** @var User $user */
         $user = $request->user();
-        $isAdmin = $this->roleName($user) === 'Admin';
+
+        $isAdmin =
+            $this->roleName($user) === 'Admin';
 
         if (
             !$isAdmin
             && (
-                !$this->canParticipate($user, $ticket)
+                !$this->canParticipate(
+                    $user,
+                    $ticket
+                )
                 || (int) $comment->userId
                     !== (int) $user->id
             )
@@ -367,7 +377,10 @@ class TicketCommentController extends Controller
         ]);
 
         if (
-            !$this->canCreateInternalNotes($user, $ticket)
+            !$this->canCreateInternalNotes(
+                $user,
+                $ticket
+            )
             || $comment->parent?->isInternal
         ) {
             unset($validated['isInternal']);
@@ -394,10 +407,12 @@ class TicketCommentController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Comment updated successfully.',
+            'message' =>
+                'Comment updated successfully.',
             'data' => $comment->fresh([
                 'user.role',
                 'parent.user.role',
+                'attachments.uploadedBy.role',
             ]),
         ]);
     }
@@ -416,12 +431,17 @@ class TicketCommentController extends Controller
 
         /** @var User $user */
         $user = $request->user();
-        $isAdmin = $this->roleName($user) === 'Admin';
+
+        $isAdmin =
+            $this->roleName($user) === 'Admin';
 
         if (
             !$isAdmin
             && (
-                !$this->canParticipate($user, $ticket)
+                !$this->canParticipate(
+                    $user,
+                    $ticket
+                )
                 || (int) $comment->userId
                     !== (int) $user->id
             )
@@ -436,8 +456,31 @@ class TicketCommentController extends Controller
             return $this->terminalTicketResponse();
         }
 
+        $comment->load([
+            'attachments',
+            'replies.attachments',
+        ]);
+
+        $attachmentPaths = $comment->attachments
+            ->pluck('filePath')
+            ->merge(
+                $comment->replies
+                    ->flatMap(
+                        fn (TicketComment $reply) =>
+                            $reply->attachments
+                                ->pluck('filePath')
+                    )
+            )
+            ->filter()
+            ->unique();
+
+        foreach ($attachmentPaths as $path) {
+            Storage::disk('public')->delete($path);
+        }
+
         $commentId = $comment->id;
-        $isReply = $comment->parentCommentId !== null;
+        $isReply =
+            $comment->parentCommentId !== null;
 
         $comment->delete();
 
@@ -458,7 +501,8 @@ class TicketCommentController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Comment deleted successfully.',
+            'message' =>
+                'Comment deleted successfully.',
         ]);
     }
 }

@@ -160,6 +160,9 @@ function TicketDetailsPage() {
   const [commentText, setCommentText] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
+  const [commentFile, setCommentFile] = useState(null);
+  const [commentFileInputKey, setCommentFileInputKey] =
+    useState(0);
   const [selectedFile, setSelectedFile] = useState(null);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -191,7 +194,7 @@ function TicketDetailsPage() {
     ["Admin", "Manager"].includes(role) || isCurrentAgent;
   const canUpload =
     !isTerminal &&
-    (role === "Admin" ||
+    (["Admin", "Manager"].includes(role) ||
       isCurrentAgent ||
       (role === "User" && isOwner));
 
@@ -375,23 +378,81 @@ function TicketDetailsPage() {
 
     if (!commentText.trim()) return;
 
+    try {
+      setIsWorking(true);
+      setErrorMessage("");
+
+      const response = await addTicketComment(
+        ticketId,
+        {
+          comment: commentText,
+          isInternal,
+          parentCommentId: replyTo?.id || null,
+        },
+        token
+      );
+
+      const createdComment = response?.data;
+
+      if (commentFile && createdComment?.id) {
+        await uploadTicketAttachment(
+          ticketId,
+          commentFile,
+          token,
+          createdComment.id
+        );
+      }
+
+      setSuccessMessage(
+        replyTo ? "Reply added." : "Comment added."
+      );
+      setCommentText("");
+      setIsInternal(false);
+      setReplyTo(null);
+      setCommentFile(null);
+      setCommentFileInputKey((current) => current + 1);
+      await loadPage();
+    } catch (error) {
+      setErrorMessage(
+        errorText(error, "Unable to add the comment.")
+      );
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
+  function canDeleteCommentAttachment(attachment) {
+    return (
+      !isTerminal &&
+      (["Admin", "Manager"].includes(role) ||
+        (canUpload &&
+          Number(attachment.uploadedByUserId) ===
+            Number(user?.id)))
+    );
+  }
+
+  function downloadCommentAttachment(attachment) {
+    downloadTicketAttachment(
+      ticketId,
+      attachment,
+      token
+    ).catch((error) =>
+      setErrorMessage(
+        errorText(error, "Download failed.")
+      )
+    );
+  }
+
+  async function deleteCommentAttachment(attachment) {
     await perform(
       () =>
-        addTicketComment(
+        deleteTicketAttachment(
           ticketId,
-          {
-            comment: commentText,
-            isInternal,
-            parentCommentId: replyTo?.id || null,
-          },
+          attachment.id,
           token
         ),
-      replyTo ? "Reply added." : "Comment added."
+      "Comment attachment deleted."
     );
-
-    setCommentText("");
-    setIsInternal(false);
-    setReplyTo(null);
   }
 
   async function handleUpload(event) {
@@ -756,6 +817,15 @@ function TicketDetailsPage() {
                       comment={comment}
                       canReply={canComment}
                       onReply={setReplyTo}
+                      onDownloadAttachment={
+                        downloadCommentAttachment
+                      }
+                      onDeleteAttachment={
+                        deleteCommentAttachment
+                      }
+                      canDeleteAttachment={
+                        canDeleteCommentAttachment
+                      }
                     />
                   ))
                 )}
@@ -791,6 +861,23 @@ function TicketDetailsPage() {
                     }
                     required
                   />
+
+                  <label className="comment-file-field">
+                    Optional attachment
+                    <input
+                      key={commentFileInputKey}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
+                      onChange={(event) =>
+                        setCommentFile(
+                          event.target.files?.[0] || null
+                        )
+                      }
+                    />
+                    <small>
+                      PDF, DOC, DOCX, PNG, JPG, or TXT; maximum 10 MB.
+                    </small>
+                  </label>
 
                   <div className="form-row">
                     {canUseInternal && !replyTo && (
@@ -1064,7 +1151,64 @@ function Metric({ label, value }) {
   );
 }
 
-function Comment({ comment, canReply, onReply }) {
+function CommentAttachments({
+  attachments = [],
+  onDownload,
+  onDelete,
+  canDelete,
+}) {
+  if (!attachments.length) return null;
+
+  return (
+    <div className="comment-attachment-list">
+      {attachments.map((attachment) => (
+        <div
+          className="comment-attachment"
+          key={attachment.id}
+        >
+          <div>
+            <strong>{attachment.fileName}</strong>
+            <small>
+              {Math.ceil(
+                Number(attachment.fileSize || 0) / 1024
+              )}{" "}
+              KB
+            </small>
+          </div>
+
+          <div className="comment-attachment-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onDownload(attachment)}
+            >
+              Download
+            </button>
+
+            {canDelete(attachment) && (
+              <button
+                type="button"
+                className="danger-link"
+                onClick={() => onDelete(attachment)}
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Comment({
+  comment,
+  canReply,
+  onReply,
+  onDownloadAttachment,
+  onDeleteAttachment,
+  canDeleteAttachment,
+}) {
   const internal =
     comment.isInternal ?? comment.is_internal ?? false;
 
@@ -1082,6 +1226,12 @@ function Comment({ comment, canReply, onReply }) {
         <time>{formatDate(comment.createdAt)}</time>
       </div>
       <p>{comment.comment}</p>
+      <CommentAttachments
+        attachments={comment.attachments || []}
+        onDownload={onDownloadAttachment}
+        onDelete={onDeleteAttachment}
+        canDelete={canDeleteAttachment}
+      />
       {canReply && (
         <button
           className="link-button"
@@ -1098,6 +1248,12 @@ function Comment({ comment, canReply, onReply }) {
             <time>{formatDate(reply.createdAt)}</time>
           </div>
           <p>{reply.comment}</p>
+          <CommentAttachments
+            attachments={reply.attachments || []}
+            onDownload={onDownloadAttachment}
+            onDelete={onDeleteAttachment}
+            canDelete={canDeleteAttachment}
+          />
         </div>
       ))}
     </article>

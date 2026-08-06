@@ -1,0 +1,207 @@
+IT HELP DESK TICKETING SYSTEM
+WEEK 5 - DASHBOARD, NOTIFICATIONS, AND ATTACHMENTS
+
+Branch:
+week-5-dashboard-notifications
+
+OBJECTIVES
+
+1. Create dashboard analytics.
+2. Add charts and KPI cards.
+3. Implement a notification center.
+4. Implement real-time notifications.
+5. Add ticket and comment file attachments.
+6. Provide recent system activity and agent statistics.
+
+COMPLETED FEATURES
+
+1. DASHBOARD ANALYTICS
+
+- Added dashboard access for Admin, Manager, and Support Agent roles.
+- Admins and Managers can view system-wide ticket analytics.
+- Support Agents can view statistics for tickets assigned to or worked on by them.
+- Added custom From and To date filters.
+- Added This Month and Last 2 Months quick filters.
+- Added KPI cards for:
+  - Total tickets
+  - Resolved tickets
+  - Closed tickets
+  - Cancelled tickets
+  - Unassigned tickets
+  - Overdue tickets
+  - Escalated tickets
+  - Reassignments
+  - Effective working time
+  - Average resolution time
+- Resolution, closure, and cancellation totals use their actual event dates.
+- Added current and previous calendar month comparisons.
+
+2. DASHBOARD CHARTS
+
+- Added a ticket status doughnut chart.
+- Added a ticket priority bar chart.
+- Added a ticket category horizontal bar chart.
+- Added a monthly line chart comparing:
+  - Created tickets
+  - Resolved tickets
+  - Closed tickets
+  - Cancelled tickets
+- Charts were implemented using Recharts.
+
+3. AGENT PERFORMANCE
+
+- Added Agent performance information showing:
+  - Currently assigned tickets
+  - Tickets in progress
+  - Resolved tickets
+  - Assignment history
+  - Work-session count
+  - Effective working time
+- Support Agents receive a personal dashboard containing only their relevant data.
+
+4. LATEST UPDATES
+
+- Added a separate Latest Updates page at /activity.
+- The page displays ticket activity from the last two months.
+- Each activity entry shows:
+  - Activity description
+  - Ticket number
+  - User who performed the action
+  - Exact date and time
+- Ticket numbers link to their ticket details pages.
+- The page is available to Admin, Manager, and Support Agent roles.
+
+5. NOTIFICATION CENTER
+
+- Added a notification bell with an unread counter.
+- Added notification listing, mark-as-read, mark-all-read, and delete behavior.
+- Notifications are generated for important ticket events, including:
+  - New ticket creation
+  - Ticket assignment
+  - Ticket reassignment
+  - Assignment removal
+  - Ticket status changes
+  - New ticket comments
+  - Ticket escalation
+  - Ticket cancellation
+  - Ticket resolution or closure
+- Managers and Admins are notified when a ticket is created, closed, or cancelled.
+- Assigned Support Agents are notified when a Manager assigns or reassigns a ticket.
+
+6. REAL-TIME NOTIFICATIONS
+
+- Installed and configured Laravel Reverb.
+- Added Laravel broadcasting configuration and private user channels.
+- Added the NotificationCreated broadcast event.
+- Notifications are broadcast immediately after being stored in the database.
+- Added Laravel Echo and pusher-js to the React frontend.
+- The notification bell updates without refreshing the browser.
+- Private broadcast authorization uses Laravel Sanctum.
+- Broadcast authentication endpoint:
+  POST /api/broadcasting/auth
+
+7. TICKET ATTACHMENTS
+
+- Users can upload attachments to their own active tickets.
+- Assigned Support Agents can upload attachments to active assigned tickets.
+- Admins can upload and manage ticket attachments.
+- Authorized users can download attachments.
+- Authorized uploaders and Admins can delete attachments.
+- Attachments cannot be modified after a ticket becomes Closed or Cancelled.
+- Stored files use file paths/URLs in the database; file contents are not stored as database binary data.
+- Supported file types include:
+  - PDF
+  - DOC
+  - DOCX
+  - PNG
+  - JPG/JPEG
+  - TXT
+- Maximum file size is 10 MB.
+- Unsafe file types such as .exe and .js are rejected by backend validation.
+
+8. COMMENT AND REPLY ATTACHMENTS
+
+- Added optional attachments to ticket comments.
+- Added optional attachments to comment replies.
+- Added commentId to ticket attachments through a database migration.
+- Comment attachments support upload, download, and authorized deletion.
+- Deleting a comment also removes its associated physical attachment files.
+- Internal-comment access restrictions are preserved.
+
+MAIN TECHNOLOGIES AND LIBRARIES
+
+Frontend:
+- React
+- Vite
+- Recharts
+- Laravel Echo
+- pusher-js
+
+Backend:
+- Laravel 13
+- Laravel Sanctum
+- Laravel Reverb
+- Laravel Broadcasting
+- Eloquent ORM
+
+DATABASE CHANGE
+
+Migration added:
+2026_08_06_131204_add_comment_id_to_ticket_attachments_table.php
+
+The migration adds an optional commentId foreign key to ticket attachments so an
+attachment can belong to either the ticket itself or a specific ticket comment.
+
+SECURITY AND AUTHORIZATION
+
+- Dashboard analytics are protected by role-based authorization.
+- Support Agent report data is restricted to relevant tickets.
+- Notification broadcasting uses private per-user channels.
+- Broadcast authentication requires a valid Sanctum token.
+- Attachment access verifies ticket visibility and role permissions.
+- File validation occurs on the backend.
+- Local .env files must not be committed to Git.
+
+TESTING COMPLETED
+
+- Frontend production build completed successfully.
+- Dashboard KPI cards and charts display API data.
+- Date filters and quick-period filters work.
+- Ticket attachment upload, download, and delete work.
+- Comment and reply attachments work.
+- Real-time notification delivery works without refreshing.
+- Assignment notifications appear for the assigned Support Agent.
+- Latest Updates displays recorded ticket activity.
+- PHP syntax checks passed for the real-time notification event and service.
+- Laravel private broadcast channel registration was confirmed.
+
+RUNNING THE REAL-TIME SYSTEM
+
+Terminal 1 - Laravel API:
+cd backend
+php artisan serve
+
+Terminal 2 - Reverb WebSocket server:
+cd backend
+php artisan reverb:start
+
+Terminal 3 - React frontend:
+cd frontend
+npm run dev
+
+FINAL STATUS
+
+All Week 5 objectives have been implemented:
+
+- Dashboard analytics: Complete
+- KPI cards: Complete
+- Charts: Complete
+- Notification center: Complete
+- Real-time notifications: Complete
+- Ticket attachments: Complete
+- Comment and reply attachments: Complete
+- Latest Updates page: Complete
+- Support Agent personal analytics: Complete
+
+Week 5 implementation is complete and ready to merge into main after final Git
+verification.

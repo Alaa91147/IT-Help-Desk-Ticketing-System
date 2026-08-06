@@ -387,3 +387,68 @@ button:disabled {
     flex-direction: column;
   }
 }
+.comment-file-field {
+  display: grid;
+  gap: 6px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.comment-file-field input {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #cfd6e2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.comment-file-field small {
+  color: #667085;
+  font-weight: 400;
+}
+
+.comment-attachment-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.comment-attachment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.comment-attachment > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.comment-attachment strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.comment-attachment small {
+  color: #667085;
+}
+
+.comment-attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .comment-attachment {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
