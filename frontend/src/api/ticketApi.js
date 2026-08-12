@@ -269,3 +269,63 @@ export function deleteTicketAttachment(
     }
   );
 }
+
+export function aiTriage(ticketId, token) {
+  return apiRequest(`/tickets/${ticketId}/ai-triage`, {
+    method: "POST",
+    token,
+  });
+}
+
+export function requestAgent(ticketId, token) {
+  return apiRequest(`/tickets/${ticketId}/request-agent`, {
+    method: "POST",
+    token,
+  });
+}
+
+export function acceptAgentRequest(ticketId, token) {
+  return apiRequest(`/tickets/${ticketId}/agent-request/accept`, {
+    method: "PATCH",
+    token,
+  });
+}
+
+export function rejectAgentRequest(ticketId, token) {
+  return apiRequest(`/tickets/${ticketId}/agent-request/reject`, {
+    method: "PATCH",
+    token,
+  });
+}
+
+export function exportTicketsPdf(token, filters = {}) {
+  const query = buildQueryString(filters);
+  return apiDownload(`/reports/tickets/pdf${query ? `?${query}` : ''}`, { token, fallbackFileName: 'tickets-report.pdf' });
+}
+
+export function exportTicketsExcel(token, filters = {}) {
+  const query = buildQueryString(filters);
+  return apiDownload(`/reports/tickets/excel${query ? `?${query}` : ''}`, { token, fallbackFileName: 'tickets-report.csv' });
+}
+
+export function checkTicketDuplicates(subject, description, token) {
+  return apiRequest("/tickets/duplicate-check", {
+    method: "POST",
+    token,
+    body: {
+      subject: subject.trim(),
+      description: description.trim(),
+    },
+  });
+}
+
+export function previewTicketClassification(subject, description, token) {
+  return apiRequest("/tickets/classification-preview", {
+    method: "POST",
+    token,
+    body: {
+      subject: subject.trim(),
+      description: description.trim(),
+    },
+  });
+}

@@ -22,6 +22,13 @@ class Ticket extends Model
         'statusId',
         'subject',
         'description',
+        'ai_metadata',
+        'ai_category_id',
+        'ai_priority_id',
+        'duplicate_of',
+        'agent_requester_id',
+        'agent_request_status',
+        'agent_requested_at',
         'dueAt',
         'startedAt',
         'escalatedAt',
@@ -40,6 +47,8 @@ class Ticket extends Model
         'cancelledAt' => 'datetime',
         'resolvedAt' => 'datetime',
         'closedAt' => 'datetime',
+        'ai_metadata' => 'array',
+        'agent_requested_at' => 'datetime',
         'createdAt' => 'datetime',
         'updatedAt' => 'datetime',
     ];
@@ -52,6 +61,11 @@ class Ticket extends Model
     public function assignedUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assignedUserId');
+    }
+
+    public function requester(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'agent_requester_id');
     }
 
     public function category(): BelongsTo

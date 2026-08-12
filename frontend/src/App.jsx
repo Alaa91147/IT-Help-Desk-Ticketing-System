@@ -11,6 +11,8 @@ import RegisterPage from "./pages/RegisterPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import TicketDetailsPage from "./pages/TicketDetailsPage";
 import TicketsPage from "./pages/TicketsPage";
+import AssistantPage from "./pages/AssistantPage";
+import AgentRequestsPage from "./pages/AgentRequestsPage";
 import UserDetailsPage from "./pages/UserDetailsPage";
 import UsersPage from "./pages/UsersPage";
 import VerifyOtpPage from "./pages/VerifyOtpPage";
@@ -61,6 +63,24 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={ALL_ROLES}>
             <TicketsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/assistant"
+        element={
+          <ProtectedRoute allowedRoles={ALL_ROLES}>
+            <AssistantPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/agent-requests"
+        element={
+          <ProtectedRoute allowedRoles={["Admin"]}>
+            <AgentRequestsPage />
           </ProtectedRoute>
         }
       />

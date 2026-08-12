@@ -41,12 +41,17 @@ function Sidebar() {
 
         <NavLink to="/tickets">Tickets</NavLink>
 
+        <NavLink to="/assistant">Support Assistant</NavLink>
+
         {role === "User" && (
           <NavLink to="/tickets/create">Create Ticket</NavLink>
         )}
 
         {role === "Admin" && (
-          <NavLink to="/users">Users</NavLink>
+          <>
+            <NavLink to="/agent-requests">Agent Requests</NavLink>
+            <NavLink to="/users">Users</NavLink>
+          </>
         )}
 
         <NavLink to="/profile">Profile</NavLink>

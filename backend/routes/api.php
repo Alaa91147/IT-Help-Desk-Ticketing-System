@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\StatusController;
 use App\Http\Controllers\Api\TicketAttachmentController;
 use App\Http\Controllers\Api\TicketCommentController;
 use App\Http\Controllers\Api\TicketController;
+use App\Http\Controllers\Api\TicketRequestController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -211,6 +212,22 @@ Route::middleware('auth:sanctum')->group(function (): void {
         [TicketController::class, 'ticketSummary']
     );
 
+    Route::get(
+        '/reports/tickets/pdf',
+        [\App\Http\Controllers\Api\ReportController::class, 'ticketsPdf']
+    )->middleware('role:Admin,Manager,SupportAgent');
+
+    Route::get(
+        '/reports/tickets/excel',
+        [\App\Http\Controllers\Api\ReportController::class, 'ticketsExcel']
+    )->middleware('role:Admin,Manager,SupportAgent');
+
+    // AI assistant chat
+    Route::post(
+        '/assistant/chat',
+        [\App\Http\Controllers\Api\AssistantController::class, 'chat']
+    );
+
     /*
     |--------------------------------------------------------------------------
     | Notifications
@@ -303,6 +320,11 @@ Route::middleware('auth:sanctum')
             '/',
             [TicketController::class, 'store']
         );
+
+        Route::get(
+            '/agent-requests',
+            [TicketRequestController::class, 'index']
+        )->middleware('role:Admin');
 
         Route::get(
             '/{ticket}',
@@ -413,4 +435,27 @@ Route::middleware('auth:sanctum')
             '/{ticket}/attachments/{attachment}',
             [TicketAttachmentController::class, 'destroy']
         );
+
+        // AI triage: categorize and prioritize via AI
+        Route::post(
+            '/{ticket}/ai-triage',
+            [\App\Http\Controllers\Api\TicketAiController::class, 'triage']
+        );
+
+        // Agent request workflow
+        Route::post(
+            '/{ticket}/agent-requests',
+            [TicketRequestController::class, 'request']
+        );
+
+        // Admin accept/reject
+        Route::patch(
+            '/{ticket}/agent-request/accept',
+            [TicketRequestController::class, 'accept']
+        )->middleware('role:Admin');
+
+        Route::patch(
+            '/{ticket}/agent-request/reject',
+            [TicketRequestController::class, 'reject']
+        )->middleware('role:Admin');
     });

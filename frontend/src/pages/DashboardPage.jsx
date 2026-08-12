@@ -9,6 +9,7 @@ import DashboardLayout from "../components/Dashboard/DashboardLayout";
 import RecentTicketsTable from "../components/Dashboard/RecentTicketsTable";
 import StatCard from "../components/Dashboard/StatCard";
 import { useAuth } from "../context/AuthContext";
+import ExportButtons from "../components/Reports/ExportButtons";
 
 function formatDuration(seconds) {
   const value = Math.max(0, Number(seconds) || 0);
@@ -129,6 +130,7 @@ function DashboardPage() {
               ? "Your assigned workload, progress and service-time overview."
               : "Workflow, workload and service-time overview."}
           </p>
+          <ExportButtons filters={appliedPeriod} />
         </div>
 
         <form className="report-period" onSubmit={applyPeriod}>

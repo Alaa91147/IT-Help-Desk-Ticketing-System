@@ -35,4 +35,18 @@ return [
         ],
     ],
 
+    'ai' => [
+    'endpoint' => env(
+        'AI_PROVIDER_ENDPOINT',
+        'https://api.openai.com/v1/chat/completions'
+    ),
+
+    'key' => env('OPENAI_API_KEY'),
+
+    'model' => env(
+        'AI_MODEL',
+        'gpt-4o-mini'
+    ),
+],
+
 ];

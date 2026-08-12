@@ -1,3 +1,34 @@
+# IT Help Desk Ticketing System
+
+This workspace contains a Laravel backend and a React frontend for a help desk ticketing system.
+
+Setup (quick):
+
+Backend:
+
+```powershell
+cd backend
+composer install
+php artisan key:generate
+php artisan migrate
+php artisan serve
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Environment variables:
+- `OPENAI_API_KEY` — required for AI features.
+- `AI_PROVIDER_ENDPOINT` — optional, defaults to OpenAI Chat Completions.
+
+Exports:
+- PDF export uses `barryvdh/laravel-dompdf`.
+- Excel export uses `maatwebsite/excel`.
 # IT Help Desk & Ticketing Management System
 
 ## Project Overview

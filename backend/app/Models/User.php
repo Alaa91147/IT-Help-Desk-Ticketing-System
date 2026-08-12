@@ -118,4 +118,19 @@ class User extends Authenticatable
     {
         return $this->emailVerifiedAt !== null;
     }
+    public function ticketAgentRequests(): HasMany
+{
+    return $this->hasMany(
+        TicketAgentRequest::class,
+        'agentId'
+    );
+}
+
+public function reviewedTicketAgentRequests(): HasMany
+{
+    return $this->hasMany(
+        TicketAgentRequest::class,
+        'reviewedByUserId'
+    );
+}
 }

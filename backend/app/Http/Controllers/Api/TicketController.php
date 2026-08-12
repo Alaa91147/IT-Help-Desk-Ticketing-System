@@ -336,7 +336,7 @@ class TicketController extends Controller
             'description' => $validated['description'],
             'dueAt' => $this->calculateDueAt($priority),
         ]);
-                $this->activityService->ticketCreated(
+        $this->activityService->ticketCreated(
             $ticket,
             $user,
             $request->ip()
@@ -346,10 +346,49 @@ $this->notificationService
         $ticket,
         $user
     );
+        // Run duplicate detection service
+        try {
+            $detector = new \App\Services\TicketDuplicateDetector();
+            $dup = $detector->detect($ticket);
+            if (! empty($dup['duplicate_id'])) {
+                $ticket->duplicate_of = $dup['duplicate_id'];
+                $ticket->save();
+            }
+        } catch (\Throwable $e) {
+            // ignore detection failures
+        }
+
+        // Optionally run AI triage (if API key configured)
+        $aiResult = null;
+        try {
+            $ai = new \App\Services\AiTicketService();
+            $aiResult = $ai->categorizeAndPrioritize($ticket->subject, $ticket->description);
+            if (! empty($aiResult['category'])) {
+                $cat = \App\Models\Category::where('name', 'like', $aiResult['category'])->first();
+                if ($cat) {
+                    $ticket->ai_category_id = $cat->id;
+                }
+            }
+            if (! empty($aiResult['priority'])) {
+                $prio = \App\Models\Priority::where('name', 'like', $aiResult['priority'])->first();
+                if ($prio) {
+                    $ticket->ai_priority_id = $prio->id;
+                }
+            }
+            if (! empty($aiResult['metadata'])) {
+                $ticket->ai_metadata = $aiResult['metadata'];
+            }
+            $ticket->save();
+        } catch (\Throwable $e) {
+            // ignore AI failures
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Ticket created successfully.',
             'data' => $ticket->load(['user', 'category', 'priority', 'status']),
+            'duplicate' => $dup ?? null,
+            'ai' => $aiResult,
         ], 201);
     }
 

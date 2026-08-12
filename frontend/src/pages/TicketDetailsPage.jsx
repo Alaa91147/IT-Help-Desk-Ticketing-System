@@ -32,6 +32,8 @@ import {
 } from "../api/ticketApi";
 import { useAuth } from "../context/AuthContext";
 import "../styles/ticket-details.css";
+import { submitAgentRequest } from "../api/agentRequestApi";
+import ExportButtons from "../components/Reports/ExportButtons";
 
 function arrayFrom(response) {
   if (Array.isArray(response)) return response;
@@ -164,6 +166,10 @@ function TicketDetailsPage() {
   const [commentFileInputKey, setCommentFileInputKey] =
     useState(0);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [agentRequestMessage, setAgentRequestMessage] =
+    useState("");
+  const [agentRequestSubmitted, setAgentRequestSubmitted] =
+    useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -177,6 +183,14 @@ function TicketDetailsPage() {
   const isCurrentAgent =
     role === "SupportAgent" &&
     Number(ticket?.assignedUserId) === Number(user?.id);
+  const canRequestTicket =
+    role === "SupportAgent" &&
+    !ticket?.assignedUserId &&
+    ticket?.agent_request_status !== "requested" &&
+    !agentRequestSubmitted &&
+    !["Resolved", "Closed", "Cancelled"].includes(
+      statusName
+    );
 
   const canManageAssignment = ["Admin", "Manager"].includes(role);
   const canEditClassification =
@@ -337,6 +351,37 @@ function TicketDetailsPage() {
         ? "Ticket reassigned successfully."
         : "Ticket assigned successfully."
     );
+  }
+
+  async function handleAgentRequest(event) {
+    event.preventDefault();
+
+    try {
+      setIsWorking(true);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      await submitAgentRequest(
+        ticketId,
+        agentRequestMessage,
+        token
+      );
+
+      setAgentRequestMessage("");
+      setAgentRequestSubmitted(true);
+      setSuccessMessage(
+        "Ticket request submitted successfully. An Admin must approve it."
+      );
+    } catch (error) {
+      setErrorMessage(
+        errorText(
+          error,
+          "Unable to submit the ticket request."
+        )
+      );
+    } finally {
+      setIsWorking(false);
+    }
   }
 
   async function handleWorkflow(event) {
@@ -588,6 +633,9 @@ function TicketDetailsPage() {
             <p className="ticket-description">
               {ticket.description}
             </p>
+            <div className="ticket-hero-actions">
+              <ExportButtons />
+            </div>
           </div>
 
           <dl className="ticket-facts">
@@ -1004,6 +1052,61 @@ function TicketDetailsPage() {
           </div>
 
           <aside className="ticket-side-column">
+            {canRequestTicket && (
+              <section className="card section-card">
+                <h2>Request this ticket</h2>
+
+                <p className="muted">
+                  Ask an Admin for permission to work on this
+                  available ticket.
+                </p>
+
+                <form
+                  className="stack-form"
+                  onSubmit={handleAgentRequest}
+                >
+                  <label>
+                    Message to Admin
+                    <textarea
+                      rows="4"
+                      maxLength="1000"
+                      value={agentRequestMessage}
+                      placeholder="Explain why you want to handle this ticket (optional)."
+                      onChange={(event) =>
+                        setAgentRequestMessage(
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <button
+                    type="submit"
+                    className="primary-button"
+                    disabled={isWorking}
+                  >
+                    {isWorking
+                      ? "Submitting..."
+                      : "Request Ticket"}
+                  </button>
+                </form>
+              </section>
+            )}
+
+            {role === "SupportAgent" &&
+              (agentRequestSubmitted ||
+                (ticket?.agent_request_status === "requested" &&
+                  Number(ticket?.agent_requester_id) ===
+                    Number(user?.id))) && (
+                <section className="card section-card">
+                  <h2>Request pending</h2>
+                  <p className="muted">
+                    Your request was submitted. You will be
+                    notified when an Admin accepts or rejects it.
+                  </p>
+                </section>
+              )}
+
             {canEditClassification && (
               <section className="card section-card">
                 <h2>Classification</h2>
