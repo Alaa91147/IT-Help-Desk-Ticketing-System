@@ -222,11 +222,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
         [\App\Http\Controllers\Api\ReportController::class, 'ticketsExcel']
     )->middleware('role:Admin,Manager,SupportAgent');
 
-    // AI assistant chat
-    Route::post(
-        '/assistant/chat',
-        [\App\Http\Controllers\Api\AssistantController::class, 'chat']
-    );
+   // AI assistant chat
+Route::post(
+    '/assistant/chat',
+    [\App\Http\Controllers\Api\AssistantController::class, 'chat']
+)->middleware('role:Admin,Manager,SupportAgent');
 
     /*
     |--------------------------------------------------------------------------

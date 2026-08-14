@@ -87,10 +87,20 @@ function TicketsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const canCreate = role === "Admin" || role === "User";
-  const canOpenDashboard =
-    role === "Admin" || role === "Manager";
+ const staffRoles = [
+  "Admin",
+  "Manager",
+  "SupportAgent",
+];
 
+const canCreate =
+  role === "Admin" || role === "User";
+
+  const canOpenDashboard =
+  role === "Admin" || role === "Manager";
+
+const canUseAssistant =
+  staffRoles.includes(role);
   const loadTickets = useCallback(
     async (page = 1) => {
       try {
@@ -195,7 +205,15 @@ function TicketsPage() {
         </div>
 
             <div className="tickets-header-actions">
-              <NotificationBell />
+              
+              {canUseAssistant && (
+  <button
+    className="button button-secondary"
+    onClick={() => navigate("/assistant")}
+  >
+    Support Assistant
+  </button>
+)}
 
               {canOpenDashboard && (
                 <button

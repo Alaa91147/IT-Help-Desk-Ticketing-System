@@ -1,7 +1,16 @@
-import { NavLink, useNavigate } from "react-router";
+import {
+  NavLink,
+  useNavigate,
+} from "react-router";
+
 import { useAuth } from "../../context/AuthContext";
 
-const REPORT_ROLES = [
+const MANAGEMENT_ROLES = [
+  "Admin",
+  "Manager",
+];
+
+const ASSISTANT_ROLES = [
   "Admin",
   "Manager",
   "SupportAgent",
@@ -12,18 +21,30 @@ function Sidebar() {
   const { logout, user } = useAuth();
 
   const role =
-    user?.role?.roleName || user?.roleName || user?.role || "";
-  const canViewReports = REPORT_ROLES.includes(role);
+    user?.role?.roleName ||
+    user?.roleName ||
+    user?.role ||
+    "";
+
+  const canViewManagement =
+    MANAGEMENT_ROLES.includes(role);
+
+  const canUseAssistant =
+    ASSISTANT_ROLES.includes(role);
 
   async function handleLogout() {
     await logout();
-    navigate("/login", { replace: true });
+
+    navigate("/login", {
+      replace: true,
+    });
   }
 
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
         <span>HD</span>
+
         <div>
           <strong>HelpDesk</strong>
           <small>{role}</small>
@@ -31,30 +52,49 @@ function Sidebar() {
       </div>
 
       <nav>
-        {canViewReports && (
-          <NavLink to="/dashboard">Dashboard</NavLink>
+        {canViewManagement && (
+          <NavLink to="/dashboard">
+            Dashboard
+          </NavLink>
         )}
 
-        {canViewReports && (
-          <NavLink to="/activity">Latest Updates</NavLink>
+        {canViewManagement && (
+          <NavLink to="/activity">
+            Latest Updates
+          </NavLink>
         )}
 
-        <NavLink to="/tickets">Tickets</NavLink>
+        <NavLink to="/tickets">
+          Tickets
+        </NavLink>
 
-        <NavLink to="/assistant">Support Assistant</NavLink>
+        {canUseAssistant && (
+          <NavLink to="/assistant">
+            Support Assistant
+          </NavLink>
+        )}
 
         {role === "User" && (
-          <NavLink to="/tickets/create">Create Ticket</NavLink>
+          <NavLink to="/tickets/create">
+            Create Ticket
+          </NavLink>
         )}
 
         {role === "Admin" && (
           <>
-            <NavLink to="/agent-requests">Agent Requests</NavLink>
-            <NavLink to="/users">Users</NavLink>
+            <NavLink to="/agent-requests">
+              Agent Requests
+            </NavLink>
+
+            <NavLink to="/users">
+              Users
+            </NavLink>
           </>
         )}
 
-        <NavLink to="/profile">Profile</NavLink>
+        <NavLink to="/profile">
+          Profile
+        </NavLink>
 
         <button
           type="button"

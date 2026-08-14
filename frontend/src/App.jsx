@@ -1,6 +1,12 @@
-import { Navigate, Route, Routes } from "react-router";
+import {
+  Navigate,
+  Route,
+  Routes,
+} from "react-router";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import AgentRequestsPage from "./pages/AgentRequestsPage";
+import AssistantPage from "./pages/AssistantPage";
 import CreateTicketPage from "./pages/CreateTicketPage";
 import DashboardPage from "./pages/DashboardPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -11,8 +17,6 @@ import RegisterPage from "./pages/RegisterPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import TicketDetailsPage from "./pages/TicketDetailsPage";
 import TicketsPage from "./pages/TicketsPage";
-import AssistantPage from "./pages/AssistantPage";
-import AgentRequestsPage from "./pages/AgentRequestsPage";
 import UserDetailsPage from "./pages/UserDetailsPage";
 import UsersPage from "./pages/UsersPage";
 import VerifyOtpPage from "./pages/VerifyOtpPage";
@@ -24,7 +28,16 @@ const ALL_ROLES = [
   "User",
 ];
 
-const REPORT_ROLES = [
+// Only Admin and Manager can access
+// Dashboard and Latest Updates.
+const MANAGEMENT_ROLES = [
+  "Admin",
+  "Manager",
+];
+
+// Admin, Manager and SupportAgent
+// can access the Support Assistant.
+const ASSISTANT_ROLES = [
   "Admin",
   "Manager",
   "SupportAgent",
@@ -33,17 +46,47 @@ const REPORT_ROLES = [
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/verify-otp" element={<VerifyOtpPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route
+        path="/"
+        element={
+          <Navigate
+            to="/login"
+            replace
+          />
+        }
+      />
+
+      <Route
+        path="/login"
+        element={<LoginPage />}
+      />
+
+      <Route
+        path="/register"
+        element={<RegisterPage />}
+      />
+
+      <Route
+        path="/verify-otp"
+        element={<VerifyOtpPage />}
+      />
+
+      <Route
+        path="/forgot-password"
+        element={<ForgotPasswordPage />}
+      />
+
+      <Route
+        path="/reset-password"
+        element={<ResetPasswordPage />}
+      />
 
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute allowedRoles={REPORT_ROLES}>
+          <ProtectedRoute
+            allowedRoles={MANAGEMENT_ROLES}
+          >
             <DashboardPage />
           </ProtectedRoute>
         }
@@ -52,7 +95,9 @@ function App() {
       <Route
         path="/activity"
         element={
-          <ProtectedRoute allowedRoles={REPORT_ROLES}>
+          <ProtectedRoute
+            allowedRoles={MANAGEMENT_ROLES}
+          >
             <LatestUpdatesPage />
           </ProtectedRoute>
         }
@@ -61,7 +106,9 @@ function App() {
       <Route
         path="/tickets"
         element={
-          <ProtectedRoute allowedRoles={ALL_ROLES}>
+          <ProtectedRoute
+            allowedRoles={ALL_ROLES}
+          >
             <TicketsPage />
           </ProtectedRoute>
         }
@@ -70,7 +117,9 @@ function App() {
       <Route
         path="/assistant"
         element={
-          <ProtectedRoute allowedRoles={ALL_ROLES}>
+          <ProtectedRoute
+            allowedRoles={ASSISTANT_ROLES}
+          >
             <AssistantPage />
           </ProtectedRoute>
         }
@@ -79,7 +128,9 @@ function App() {
       <Route
         path="/agent-requests"
         element={
-          <ProtectedRoute allowedRoles={["Admin"]}>
+          <ProtectedRoute
+            allowedRoles={["Admin"]}
+          >
             <AgentRequestsPage />
           </ProtectedRoute>
         }
@@ -88,7 +139,9 @@ function App() {
       <Route
         path="/tickets/create"
         element={
-          <ProtectedRoute allowedRoles={["Admin", "User"]}>
+          <ProtectedRoute
+            allowedRoles={["Admin", "User"]}
+          >
             <CreateTicketPage />
           </ProtectedRoute>
         }
@@ -97,7 +150,9 @@ function App() {
       <Route
         path="/tickets/:ticketId"
         element={
-          <ProtectedRoute allowedRoles={ALL_ROLES}>
+          <ProtectedRoute
+            allowedRoles={ALL_ROLES}
+          >
             <TicketDetailsPage />
           </ProtectedRoute>
         }
@@ -106,7 +161,9 @@ function App() {
       <Route
         path="/profile"
         element={
-          <ProtectedRoute allowedRoles={ALL_ROLES}>
+          <ProtectedRoute
+            allowedRoles={ALL_ROLES}
+          >
             <ProfilePage />
           </ProtectedRoute>
         }
@@ -115,7 +172,9 @@ function App() {
       <Route
         path="/users"
         element={
-          <ProtectedRoute allowedRoles={["Admin"]}>
+          <ProtectedRoute
+            allowedRoles={["Admin"]}
+          >
             <UsersPage />
           </ProtectedRoute>
         }
@@ -124,13 +183,23 @@ function App() {
       <Route
         path="/users/:id"
         element={
-          <ProtectedRoute allowedRoles={["Admin"]}>
+          <ProtectedRoute
+            allowedRoles={["Admin"]}
+          >
             <UserDetailsPage />
           </ProtectedRoute>
         }
       />
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route
+        path="*"
+        element={
+          <Navigate
+            to="/login"
+            replace
+          />
+        }
+      />
     </Routes>
   );
 }
