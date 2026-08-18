@@ -33,7 +33,6 @@ import {
 import { useAuth } from "../context/AuthContext";
 import "../styles/ticket-details.css";
 import { submitAgentRequest } from "../api/agentRequestApi";
-import ExportButtons from "../components/Reports/ExportButtons";
 
 function arrayFrom(response) {
   if (Array.isArray(response)) return response;
@@ -633,9 +632,7 @@ function TicketDetailsPage() {
             <p className="ticket-description">
               {ticket.description}
             </p>
-            <div className="ticket-hero-actions">
-              <ExportButtons />
-            </div>
+            
           </div>
 
           <dl className="ticket-facts">
