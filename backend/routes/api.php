@@ -435,7 +435,31 @@ Route::middleware('auth:sanctum')
             '/{ticket}/attachments/{attachment}',
             [TicketAttachmentController::class, 'destroy']
         );
+        // Check for similar tickets before creation
+Route::post(
+    '/duplicate-check',
+    [
+        \App\Http\Controllers\Api\TicketDuplicateController::class,
+        'check',
+    ]
+);
 
+// Analyze category and priority before creating a ticket
+Route::post(
+    '/classification-preview',
+    [
+        \App\Http\Controllers\Api\TicketAiController::class,
+        'preview',
+    ]
+);
+// Analyze category and priority before creating a ticket
+Route::post(
+    '/classification-preview',
+    [
+        \App\Http\Controllers\Api\TicketAiController::class,
+        'preview',
+    ]
+);
         // AI triage: categorize and prioritize via AI
         Route::post(
             '/{ticket}/ai-triage',
