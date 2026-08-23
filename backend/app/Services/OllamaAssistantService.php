@@ -58,43 +58,38 @@ class OllamaAssistantService
             ];
         }
 
-        $response = Http::connectTimeout(5)
-            ->timeout(180)
-            ->post(
-                config(
-                    'services.ollama.url',
-                    'http://127.0.0.1:11434'
-                ).'/api/chat',
-                [
-                    'model' => config(
-                        'services.ollama.model',
-                        'llama3.2:3b'
-                    ),
+            $response = Http::withToken(
+                config('services.ai.key')
+            )
+                ->withoutVerifying()
+                ->connectTimeout(10)
+                ->timeout(60)
+                ->post(
+                    config('services.ai.endpoint'),
+                    [
+                        'model' => config(
+                            'services.ai.model',
+                            'gpt-4o-mini'
+                        ),
 
-                    'messages' =>
-                        $ollamaMessages,
+                        'messages' => $ollamaMessages,
 
-                    'stream' => false,
-
-                    'options' => [
                         'temperature' => 0.2,
-                        'num_gpu' => 0,
-                    ],
-                ]
-            );
+                    ]
+                );
 
         $response->throw();
 
         $answer = trim(
             (string) $response->json(
-                'message.content',
+                'choices.0.message.content',
                 ''
             )
         );
 
         if ($answer === '') {
             throw new RuntimeException(
-                'Ollama returned an empty response.'
+                'OpenAI returned an empty response.'
             );
         }
 

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use App\Services\OllamaAssistantService;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -71,37 +70,20 @@ class AssistantController extends Controller
                 $relatedTickets->all(),
                 $ticketContext
             );
-        } catch (ConnectionException $exception) {
-            Log::warning(
-                'Ollama connection failed.',
-                [
-                    'message' =>
-                        $exception->getMessage(),
-                ]
-            );
 
-            return response()->json([
-                'success' => false,
-                'message' =>
-                    'The local AI assistant is not running. '
-                    .'Please start Ollama and try again.',
-            ], 503);
-        } catch (Throwable $exception) {
-            Log::error(
-                'Ollama assistant failed.',
-                [
-                    'message' =>
-                        $exception->getMessage(),
-                ]
-            );
+            } catch (Throwable $exception) {
+    Log::error(
+        'AI assistant failed.',
+        [
+            'message' => $exception->getMessage(),
+        ]
+    );
 
-            return response()->json([
-                'success' => false,
-                'message' =>
-                    'The AI assistant could not generate '
-                    .'a response. Please try again.',
-            ], 500);
-        }
+    return response()->json([
+        'success' => false,
+        'message' => $exception->getMessage(),
+    ], 500);
+}
 
         return response()->json([
             'success' => true,
