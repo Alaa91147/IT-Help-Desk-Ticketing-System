@@ -1,4 +1,5 @@
-const API_BASE_URL = "/api";
+const API_BASE_URL =
+  "https://it-help-desk-ticketing-system-1.onrender.com/api";
 
 function buildError(responseData, fallbackMessage) {
   const error = new Error(
